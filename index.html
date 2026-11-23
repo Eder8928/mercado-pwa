@@ -176,7 +176,7 @@ VIEWS.home=()=>{
   ${last?`<h2>Última compra</h2><div class="list"><div class="li" data-h="${last.id}"><div class="grow"><div class="nm">${esc(last.store||last.listName)}</div><div class="mu sm">${dth(last.date)} · ${last.entries.length} itens</div></div><b>${money(last.total)}</b><span class="mu">›</span></div></div>`:""}
   `,after(){
     $("#nova").onclick=newList;$("#faltaBtn").onclick=listFromMissing;bindInstall();
-    onAll("[data-go]","click",el=>go(el.dataset.go));
+    onAll("main [data-go]","click",el=>go(el.dataset.go));
     onAll("[data-l]","click",el=>go("list",el.dataset.l));
     onAll("[data-h]","click",el=>go("purchase",el.dataset.h));
   }}
@@ -547,6 +547,29 @@ addEventListener("appinstalled",()=>{deferredPrompt=null;toast("App instalado!")
 if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
   addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
+/* ----- botão voltar do celular ----- */
+let armed=false;
+function armBack(){if(armed)return;try{history.pushState({guard:1},"");armed=true}catch(e){}}
+function exitDialog(){
+  sheet(`<div style="text-align:center"><span style="font-size:34px">🚪</span><h3>Gostaria de sair do app?</h3><div class="mu sm">Toque em voltar de novo também sai.</div></div>
+  <div class="grid2" style="margin-top:14px"><button class="btn ghost" id="no">Não</button><button class="btn" id="yes">Sim</button></div>`,m=>{
+    m.dataset.exit="1";
+    const stay=()=>{close();armBack()};
+    m.querySelector("#no").onclick=stay;m.onclick=e=>{if(e.target===m)stay()};
+    m.querySelector("#yes").onclick=()=>{close();try{window.close()}catch(e){}
+      setTimeout(()=>{if(!document.hidden)toast("Toque em voltar para fechar o app")},300)};
+  });
+}
+addEventListener("popstate",()=>{
+  armed=false;
+  const m=$("#layer").firstChild;
+  if(m){close();armBack();return}                 // fecha janela/scanner aberto
+  if(view!=="home"||stack.length){back();armBack();return} // volta uma tela
+  exitDialog();                                    // na tela inicial: pergunta se quer sair (sem guarda: 2º voltar fecha)
+});
+try{history.replaceState({root:1},"")}catch(e){}
+armBack();
+addEventListener("pointerdown",()=>{if(!armed&&!$("#layer [data-exit]"))armBack()},true);
 load();render();
 </script>
 </body>
