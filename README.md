@@ -1,11 +1,18 @@
-# Minha Lista de Mercado (PWA)
+# Minha Lista de Mercado
 
-App pessoal de lista de compras: cadastro de itens, controle do que tem em casa, listas com orçamento, registro de compras e histórico de gastos.
+App de lista de compras de supermercado (PWA) — **LIVREZON TECNOLOGIA**.
+Desenvolvido por Eder Rodrigues — LIVREZON TECNOLOGIA · https://livrezon.com.br · contato@livrezon.com.br
 
-- Leitura de código de barras pela câmera (BarcodeDetector nativo ou ZXing embutido). Produtos novos são buscados na base pública Open Food Facts / Open Beauty Facts / Open Products Facts para cadastro automático.
-- Funciona offline (service worker) e pode ser instalado na tela inicial.
-- Sem login. Os dados ficam salvos apenas no aparelho (localStorage); use **Opções → Backup** para guardar uma cópia.
+## Funções
+- Cadastro de itens com catálogo sugerido, controle do que há **em casa** e geração automática da lista do que falta.
+- Listas de compras com orçamento, total do carrinho e previsão.
+- **Leitor de código de barras** pela câmera, com cadastro automático pela base Open Food Facts.
+- **Lista compartilhada** em tempo real (Firebase): várias pessoas comprando juntas, com o total somado de todos.
+- Histórico, resultado da compra e relatórios em **PDF**.
+- Funciona **offline**, sem cadastro, instalável no celular, tablet e computador.
+- LGPD: dados locais no aparelho, aceite de termos, política de privacidade, exportação e exclusão de dados, expiração automática das listas na nuvem.
+- **Painel Master** (`/master`): uso, manutenção, aviso global, versão mínima, suporte, Master Backup criptografado (AES-256) e log de auditoria imutável.
 
-Acesse: https://eder8928.github.io/mercado-pwa/
-
-Biblioteca de leitura: [ZXing](https://github.com/zxing-js/library) (Apache-2.0), incluída em `zxing.min.js`.
+## Estrutura
+App estático (HTML/JS sem build), hospedado no GitHub Pages. Bibliotecas incluídas localmente: Firebase JS SDK, ZXing (Apache-2.0) e jsPDF/jsPDF-AutoTable (MIT).
+Configuração: veja `FIREBASE.md`.
