@@ -68,11 +68,17 @@ label{display:block;font-size:14px;color:var(--mu);margin:10px 0 4px}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
 .sheet{background:var(--bg);width:100%;max-width:720px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom))}
 .sheet h3{margin:2px 0 10px;font-size:18px}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:#222;color:#fff;padding:10px 16px;border-radius:12px;z-index:30;font-size:15px;max-width:90%;text-align:center}
+.toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 64px);background:#222;color:#fff;padding:10px 16px;border-radius:12px;z-index:30;font-size:15px;max-width:90%;text-align:center}
 .warn{background:var(--yell);color:var(--yel);border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:12px}
 .big{font-size:34px;font-weight:800;color:var(--g);margin:4px 0}
 .kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--bd)}.kv:last-child{border:0}
 .neg{color:var(--red)}.pos{color:var(--g)}
+.scanbox{position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:4/3}
+.scanbox video{width:100%;height:100%;object-fit:cover;display:block}
+.scanframe{position:absolute;left:8%;right:8%;top:25%;bottom:25%;border:3px solid rgba(255,255,255,.85);border-radius:12px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+.scanline{position:absolute;left:10%;right:10%;top:50%;height:2px;background:#ff4d4d;box-shadow:0 0 8px #ff4d4d;animation:sl 1.6s ease-in-out infinite}
+@keyframes sl{0%,100%{transform:translateY(-38px)}50%{transform:translateY(38px)}}
+.okbox{background:var(--gl);color:var(--g);border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:6px}
 .catH{font-size:13px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.04em;margin:14px 4px 6px}
 </style>
 </head>
@@ -138,7 +144,7 @@ function render(){
 /* ---------- utilitários de UI ---------- */
 function toast(m){document.querySelectorAll(".toast").forEach(x=>x.remove());const t=document.createElement("div");t.className="toast";t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
 function sheet(html,onMount){const L=$("#layer");L.innerHTML=`<div class="modal"><div class="sheet">${html}</div></div>`;const m=L.firstChild;m.onclick=e=>{if(e.target===m)close()};onMount&&onMount(m);return m}
-function close(){$("#layer").innerHTML=""}
+function close(){stopScan();$("#layer").innerHTML=""}
 function ask(msg,okTxt="Confirmar",danger=false){return new Promise(res=>{sheet(`<h3>${esc(msg)}</h3><div class="grid2" style="margin-top:14px"><button class="btn ghost" id="no">Cancelar</button><button class="btn ${danger?"danger":""}" id="yes">${esc(okTxt)}</button></div>`,m=>{m.querySelector("#no").onclick=()=>{close();res(false)};m.querySelector("#yes").onclick=()=>{close();res(true)}})})}
 function onAll(sel,ev,fn){document.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,e=>fn(el,e)))}
 
@@ -180,43 +186,154 @@ VIEWS.home=()=>{
 let itemQ="",itemCat="";
 VIEWS.items=()=>{
   const q=itemQ.toLowerCase();
-  const its=S.items.filter(i=>(!q||i.name.toLowerCase().includes(q))&&(!itemCat||i.cat===itemCat)).sort(sortN);
+  const its=S.items.filter(i=>(!q||i.name.toLowerCase().includes(q)||(i.barcode||"").includes(q))&&(!itemCat||i.cat===itemCat)).sort(sortN);
   return{title:"Cadastro de itens",html:`
-  <div class="row" style="margin-bottom:10px"><input id="q" placeholder="🔎 Buscar item" value="${esc(itemQ)}"><button class="btn" id="add" style="flex:none">＋</button></div>
+  <div class="row" style="margin-bottom:10px"><input id="q" placeholder="🔎 Buscar item" value="${esc(itemQ)}"><button class="btn sec" id="scn" style="flex:none" aria-label="Escanear">📷</button><button class="btn" id="add" style="flex:none">＋</button></div>
   <div class="chips"><button class="chip ${!itemCat?"on":""}" data-c="">Todas</button>${S.cats.map(c=>`<button class="chip ${itemCat===c?"on":""}" data-c="${esc(c)}">${esc(c)}</button>`).join("")}</div>
-  ${its.length?`<div class="list">${its.map(i=>`<div class="li" data-i="${i.id}"><div class="grow"><div class="nm">${esc(i.name)}</div><div class="mu sm">${esc(i.cat)} · ${esc(i.unit)}${i.price?" · "+money(i.price):""}</div></div><span class="mu">›</span></div>`).join("")}</div>`:`<div class="empty"><span class="i">🥫</span>Nenhum item encontrado.</div>`}
+  ${its.length?`<div class="list">${its.map(i=>`<div class="li" data-i="${i.id}"><div class="grow"><div class="nm">${esc(i.name)}</div><div class="mu sm">${esc(i.cat)} · ${esc(i.unit)}${i.price?" · "+money(i.price):""}${i.barcode?" · ▮▮ "+esc(i.barcode):""}</div></div><span class="mu">›</span></div>`).join("")}</div>`:`<div class="empty"><span class="i">🥫</span>Nenhum item encontrado.</div>`}
   <div class="mu sm" style="text-align:center">${S.items.length} itens cadastrados</div>`,
   after(){
     const qi=$("#q");qi.oninput=()=>{itemQ=qi.value;const p=qi.selectionStart;render();const n=$("#q");n.focus();n.setSelectionRange(p,p)};
-    $("#add").onclick=()=>itemForm(null,itemQ);
+    $("#add").onclick=()=>itemForm(null,itemQ);$("#scn").onclick=()=>scan(c=>onScanned(c,{t:"items"}),"Escanear para cadastrar");
     onAll("[data-c]","click",el=>{itemCat=el.dataset.c;render()});
     onAll("[data-i]","click",el=>itemForm(el.dataset.i));
   }}
 };
-function itemForm(id,preName,cb){
-  const it=id?item(id):{name:preName||"",cat:itemCat||S.cats[0],unit:"un",price:0,min:0,stock:0};
+function itemForm(id,preName,cb,preset){
+  const base=id?item(id):{name:preName||"",cat:itemCat||S.cats[0],unit:"un",price:0,min:0,stock:0,barcode:""};
+  const it={...base,...(preset||{})};
   sheet(`<h3>${id?"Editar item":"Novo item"}</h3>
+  ${it.note?`<div class="${it.noteOk?"okbox":"warn"}">${esc(it.note)}</div>`:""}
   <label>Nome</label><input id="f_n" value="${esc(it.name)}" placeholder="Ex.: Arroz 5kg">
+  <label>Código de barras</label><div class="row"><input id="f_b" inputmode="numeric" value="${esc(it.barcode||"")}" placeholder="Opcional"><button class="btn sec" id="f_sc" style="flex:none" aria-label="Escanear">📷</button></div>
   <div class="grid2"><div><label>Categoria</label><select id="f_c">${S.cats.map(c=>`<option ${c===it.cat?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
   <div><label>Unidade</label><select id="f_u">${UNITS.map(u=>`<option ${u===it.unit?"selected":""}>${u}</option>`).join("")}</select></div></div>
   <label>Preço de referência (R$)</label><input id="f_p" inputmode="decimal" value="${fmtP(it.price)}" placeholder="0,00">
   <div class="grid2"><div><label>Tenho em casa</label><input id="f_s" inputmode="decimal" value="${fmtN(it.stock)}"></div>
   <div><label>Mínimo em casa</label><input id="f_m" inputmode="decimal" value="${fmtN(it.min)}"></div></div>
   <div class="mu sm" style="margin-top:6px">Quando "tenho em casa" ficar abaixo do mínimo, o item aparece como faltando.</div>
-  <div class="grid2" style="margin-top:16px">${id?`<button class="btn danger" id="del">Excluir</button>`:`<button class="btn ghost" id="cancel">Cancelar</button>`}<button class="btn" id="ok">Salvar</button></div>`,m=>{
-    if(!id)m.querySelector("#f_n").focus();
+  <div class="grid2" style="margin-top:16px">${id?`<button class="btn danger" id="del">Excluir</button>`:`<button class="btn ghost" id="cancel">Cancelar</button>`}<button class="btn" id="ok">${cb&&!id?"Cadastrar e continuar":"Salvar"}</button></div>`,m=>{
+    if(!id&&!it.name)m.querySelector("#f_n").focus();
+    const read=()=>({name:m.querySelector("#f_n").value.trim(),barcode:cleanCode(m.querySelector("#f_b").value),cat:m.querySelector("#f_c").value,unit:m.querySelector("#f_u").value,price:num(m.querySelector("#f_p").value),stock:num(m.querySelector("#f_s").value),min:num(m.querySelector("#f_m").value)});
+    m.querySelector("#f_sc").onclick=()=>{const cur=read();scan(code=>itemForm(id,null,cb,{...cur,barcode:code}),"Ler código do item")};
     m.querySelector("#cancel")&&(m.querySelector("#cancel").onclick=close);
     m.querySelector("#ok").onclick=()=>{
-      const name=m.querySelector("#f_n").value.trim();if(!name){toast("Informe o nome");return}
-      if(S.items.some(x=>x.name.toLowerCase()===name.toLowerCase()&&x.id!==id)){toast("Já existe um item com esse nome");return}
-      Object.assign(it,{name,cat:m.querySelector("#f_c").value,unit:m.querySelector("#f_u").value,price:num(m.querySelector("#f_p").value),stock:num(m.querySelector("#f_s").value),min:num(m.querySelector("#f_m").value)});
-      if(!id){it.id=uid();S.items.push(it)}
-      save();close();toast("Item salvo");cb?cb(it):render();
+      const f=read();if(!f.name){toast("Informe o nome");return}
+      if(S.items.some(x=>x.name.toLowerCase()===f.name.toLowerCase()&&x.id!==id)){toast("Já existe um item com esse nome");return}
+      const dup=f.barcode&&S.items.find(x=>x.barcode===f.barcode&&x.id!==id);if(dup){toast(`Código já usado em "${dup.name}"`);return}
+      const target=id?base:{id:uid()};Object.assign(target,f);
+      if(!id)S.items.push(target);
+      save();close();toast("Item salvo");cb?cb(target):render();
     };
     m.querySelector("#del")&&(m.querySelector("#del").onclick=async()=>{
-      if(await ask(`Excluir "${it.name}"? Ele também sai das listas abertas.`,"Excluir",true)){
+      if(await ask(`Excluir "${base.name}"? Ele também sai das listas abertas.`,"Excluir",true)){
         S.items=S.items.filter(x=>x.id!==id);S.lists.forEach(l=>{if(!l.done)l.entries=l.entries.filter(e=>e.itemId!==id)});save();toast("Item excluído");render()}
     });
+  });
+}
+
+/* ----- leitor de código de barras ----- */
+const cleanCode=s=>String(s||"").replace(/[^0-9A-Za-z-]/g,"").slice(0,40);
+const byCode=c=>c&&S.items.find(i=>i.barcode===c);
+function validEAN(c){if(!/^(\d{8}|\d{12,14})$/.test(c))return false;const d=c.split("").map(Number),chk=d.pop();let t=0;d.reverse().forEach((n,i)=>t+=n*(i%2===0?3:1));return (10-t%10)%10===chk}
+const SC={stream:null,timer:0,zx:null,last:"",at:0};
+function stopScan(){clearTimeout(SC.timer);SC.timer=0;if(SC.stream){SC.stream.getTracks().forEach(t=>t.stop());SC.stream=null}}
+function loadZX(){if(window.ZXing)return Promise.resolve();if(SC.zx)return SC.zx;
+  SC.zx=new Promise(res=>{const s=document.createElement("script");s.src="zxing.min.js";s.onload=res;s.onerror=()=>{SC.zx=null;res()};document.head.appendChild(s)});return SC.zx}
+function beep(){try{navigator.vibrate&&navigator.vibrate(70)}catch(e){}try{const a=new (window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.frequency.value=1250;g.gain.value=.08;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.09);setTimeout(()=>a.close(),300)}catch(e){}}
+function scan(onCode,title="Escanear código de barras"){
+  sheet(`<div class="row"><h3 class="grow">${esc(title)}</h3><button class="ic" id="scX" aria-label="Fechar">✕</button></div>
+  <div class="scanbox"><video id="scV" playsinline muted autoplay></video><div class="scanframe"></div><div class="scanline"></div></div>
+  <div class="mu sm" id="scMsg" style="text-align:center;margin:8px 0">Abrindo a câmera…</div>
+  <div class="row"><input id="scM" inputmode="numeric" placeholder="Ou digite o código"><button class="btn" id="scOk" style="flex:none">OK</button></div>
+  <button class="btn ghost full" id="scT" style="margin-top:8px" hidden>🔦 Lanterna</button>`,m=>{
+    let done=false;const fire=c=>{if(done)return;done=true;SC.last=c;SC.at=Date.now();stopScan();beep();close();onCode(c)};
+    m.querySelector("#scX").onclick=close;
+    const mi=m.querySelector("#scM");
+    m.querySelector("#scOk").onclick=()=>{const c=cleanCode(mi.value);if(c.length<4){toast("Código inválido");return}fire(c)};
+    mi.onkeydown=e=>{if(e.key==="Enter")m.querySelector("#scOk").click()};
+    startCam(m,fire);
+  });
+}
+async function startCam(m,fire){
+  const v=m.querySelector("#scV"),msg=m.querySelector("#scMsg"),say=t=>msg.textContent=t;
+  if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){say("Câmera indisponível aqui (abra pelo app instalado). Digite o código.");return}
+  let st;try{st=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}}})}
+  catch(e){say("Sem acesso à câmera. Permita o uso da câmera para este app ou digite o código.");return}
+  if(!document.body.contains(v)){st.getTracks().forEach(t=>t.stop());return}
+  stopScan();SC.stream=st;v.srcObject=st;try{await v.play()}catch(e){}
+  if(SC.stream!==st)return;
+  const track=st.getVideoTracks()[0],caps=(track.getCapabilities&&track.getCapabilities())||{};
+  if(caps.focusMode&&caps.focusMode.includes("continuous"))track.applyConstraints({advanced:[{focusMode:"continuous"}]}).catch(()=>{});
+  if(caps.torch){const b=m.querySelector("#scT");b.hidden=false;let on=false;b.onclick=()=>{on=!on;track.applyConstraints({advanced:[{torch:on}]}).catch(()=>{})}}
+  let detect=null;
+  if("BarcodeDetector" in window){try{const fm=await BarcodeDetector.getSupportedFormats(),want=["ean_13","ean_8","upc_a","upc_e","code_128","itf"].filter(f=>fm.includes(f));
+    if(want.length){const d=new BarcodeDetector({formats:want});detect=async()=>{const r=await d.detect(v);return r.length?r[0].rawValue:null}}}catch(e){}}
+  if(!detect){say("Carregando leitor…");await loadZX();
+    if(window.ZXing){const Z=window.ZXing,h=new Map();h.set(Z.DecodeHintType.POSSIBLE_FORMATS,[Z.BarcodeFormat.EAN_13,Z.BarcodeFormat.EAN_8,Z.BarcodeFormat.UPC_A,Z.BarcodeFormat.UPC_E,Z.BarcodeFormat.CODE_128,Z.BarcodeFormat.ITF]);h.set(Z.DecodeHintType.TRY_HARDER,true);
+      const rd=new Z.MultiFormatReader();rd.setHints(h);const cv=document.createElement("canvas"),cx=cv.getContext("2d",{willReadFrequently:true});
+      detect=async()=>{const w=v.videoWidth,hh=v.videoHeight;if(!w)return null;const cw=Math.min(w,1000),ch=Math.round(hh*.5*cw/w);cv.width=cw;cv.height=ch;cx.drawImage(v,0,hh*.25,w,hh*.5,0,0,cw,ch);
+        try{return rd.decode(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(cv)))).getText()}catch(e){return null}finally{rd.reset()}}}}
+  if(!detect){say("Leitor indisponível neste aparelho. Digite o código.");return}
+  if(SC.stream!==st)return;say("Aponte para o código de barras");
+  let last="",n=0;
+  const loop=async()=>{if(SC.stream!==st)return;
+    if(v.readyState>=2){try{const raw=await detect();const c=cleanCode(raw);
+      if(c&&!(c===SC.last&&Date.now()-SC.at<3000)){const ok=validEAN(c);if(c===last)n++;else{last=c;n=1}if((ok&&n>=1)||n>=3){fire(c);return}}}catch(e){}}
+    SC.timer=setTimeout(loop,110)};
+  loop();
+}
+const CATMAP=[[/beverage|drink|water|juice|soda|beer|wine|spirit|refrigerante|bebida/,"Bebidas"],[/dair|milk|cheese|yogurt|yoghurt|butter|cream|leite|queijo|iogurte/,"Laticínios"],[/bread|bakery|biscuit|cracker|cake|bolacha|pao|pães/,"Padaria"],[/meat|poultry|chicken|beef|pork|fish|sausage|ham|carne|frango/,"Açougue"],[/frozen|ice-cream|congelad/,"Congelados"],[/fruit|vegetable|fresh|legume|hortali/,"Hortifruti"],[/clean|detergent|laundry|dishwash|household|limpeza|sabao/,"Limpeza"],[/hygiene|shampoo|soap|toothpaste|deodorant|beauty|cosmetic|diaper|toilet-paper|higiene/,"Higiene"]];
+function mapCat(tags,host){const t=(tags||[]).join(" ").toLowerCase();let c=null;for(const[re,cat]of CATMAP)if(re.test(t)){c=cat;break}
+  if(!c)c=/beauty/.test(host)?"Higiene":/products/.test(host)?"Outros":"Mercearia";return S.cats.includes(c)?c:(S.cats.includes("Outros")?"Outros":S.cats[0])}
+async function lookup(code){
+  if(!navigator.onLine||!/^\d{8,14}$/.test(code))return null;
+  for(const host of ["world.openfoodfacts.org","world.openbeautyfacts.org","world.openproductsfacts.org"]){
+    try{const ac=new AbortController(),t=setTimeout(()=>ac.abort(),7000);
+      const r=await fetch(`https://${host}/api/v2/product/${code}.json?fields=product_name,product_name_pt,generic_name,brands,quantity,categories_tags`,{signal:ac.signal});clearTimeout(t);
+      if(!r.ok)continue;const j=await r.json();if(j.status!==1||!j.product)continue;const p=j.product;
+      let nm=String(p.product_name_pt||p.product_name||p.generic_name||"").trim();if(!nm)continue;
+      const br=String(p.brands||"").split(",")[0].trim(),q=String(p.quantity||"").trim();
+      if(br&&!nm.toLowerCase().includes(br.toLowerCase()))nm+=" "+br;if(q&&!nm.toLowerCase().includes(q.toLowerCase()))nm+=" "+q;
+      return{name:nm.replace(/\s+/g," ").slice(0,80),cat:mapCat(p.categories_tags,host)};
+    }catch(e){}
+  }return null;
+}
+/* contexto: {t:"list",lid} | {t:"pantry"} | {t:"items"} */
+async function onScanned(code,ctx){
+  const it=byCode(code);
+  if(it){afterFound(it,ctx);return}
+  let found=null;
+  if(navigator.onLine&&/^\d{8,14}$/.test(code)){sheet(`<div class="empty"><span class="i">🔎</span>Buscando o produto ${esc(code)}…</div>`);found=await lookup(code)}
+  const note=found?"✅ Produto encontrado na base online. Confira os dados e salve.":(navigator.onLine?"Produto não encontrado na base online. Preencha o nome para cadastrar.":"Sem internet: preencha o nome para cadastrar. O código já está anotado.");
+  const sameName=found&&S.items.find(i=>!i.barcode&&i.name.toLowerCase()===found.name.toLowerCase());
+  if(sameName){sameName.barcode=code;save();afterFound(sameName,ctx);return}
+  itemForm(null,"",ctx.t==="items"?null:(ni=>afterFound(ni,ctx)),{barcode:code,note,noteOk:!!found,...(found||{})});
+}
+function afterFound(it,ctx){
+  if(ctx.t==="items"){itemForm(it.id);return}
+  const again=()=>scan(c=>onScanned(c,ctx),ctx.t==="list"?"Escanear para a lista":"Escanear item de casa");
+  if(ctx.t==="pantry"){
+    let q=1;sheet(`<h3>${esc(it.name)}</h3><div class="mu">Em casa agora: <b>${fmtN(it.stock)} ${esc(it.unit)}</b></div>
+    <label>Quantidade</label><div class="step" style="width:max-content"><button id="m">−</button><input id="q" inputmode="decimal" value="1"><button id="p">+</button></div>
+    <div class="grid2" style="margin-top:16px"><button class="btn danger" id="out">➖ Retirar</button><button class="btn" id="in">➕ Guardar</button></div>
+    <button class="btn ghost full" id="cl" style="margin-top:10px">Fechar</button>`,m=>{
+      const qi=m.querySelector("#q");m.querySelector("#m").onclick=()=>qi.value=fmtN(Math.max(1,num(qi.value)-1));m.querySelector("#p").onclick=()=>qi.value=fmtN(num(qi.value)+1);
+      const apply=s=>{q=Math.max(0,num(qi.value))||1;it.stock=Math.max(0,Math.round(((+it.stock||0)+s*q)*1000)/1000);save();close();toast(`${it.name}: ${fmtN(it.stock)} ${it.unit} em casa`);render();again()};
+      m.querySelector("#in").onclick=()=>apply(1);m.querySelector("#out").onclick=()=>apply(-1);m.querySelector("#cl").onclick=()=>{close();render()};
+    });return;
+  }
+  const l=S.lists.find(x=>x.id===ctx.lid);if(!l){toast("Lista não encontrada");return}
+  const e=l.entries.find(x=>x.itemId===it.id);
+  sheet(`<h3>${esc(it.name)}</h3><div class="mu">${e?(e.checked?`Já no carrinho: ${fmtN(e.qty)} ${esc(it.unit)}`:"Está na lista — vai para o carrinho"):"Novo na lista"} · em casa ${fmtN(it.stock)} ${esc(it.unit)}</div>
+  <div class="grid2"><div><label>Quantidade</label><div class="step"><button id="m">−</button><input id="q" inputmode="decimal" value="${e&&!e.checked?fmtN(e.qty):1}"><button id="p">+</button></div></div>
+  <div><label>Preço unit. (R$)</label><input id="pr" inputmode="decimal" value="${fmtP(e&&e.price||it.price)}" placeholder="0,00"></div></div>
+  <div class="grid2" style="margin-top:16px"><button class="btn ghost" id="add1">Adicionar e fechar</button><button class="btn" id="addN">Adicionar e escanear próximo</button></div>`,m=>{
+    const qi=m.querySelector("#q");m.querySelector("#m").onclick=()=>qi.value=fmtN(Math.max(1,num(qi.value)-1));m.querySelector("#p").onclick=()=>qi.value=fmtN(num(qi.value)+1);
+    const add=()=>{const q=Math.max(0,num(qi.value))||1,pr=num(m.querySelector("#pr").value);
+      if(e){e.qty=e.checked?Math.round(((+e.qty||0)+q)*1000)/1000:q;e.checked=true;if(pr)e.price=pr}else l.entries.push({itemId:it.id,qty:q,price:pr||+it.price||0,checked:true});
+      save();close();toast(`${it.name} no carrinho`);render()};
+    m.querySelector("#add1").onclick=add;m.querySelector("#addN").onclick=()=>{add();again()};
   });
 }
 
@@ -228,13 +345,14 @@ VIEWS.pantry=()=>{
   const nF=S.items.filter(needs).length;
   return{title:"Itens em casa",html:`
   <div class="chips"><button class="chip ${panF==="all"?"on":""}" data-f="all">Todos (${S.items.length})</button><button class="chip ${panF==="need"?"on":""}" data-f="need">Precisa comprar (${nF})</button></div>
+  <button class="btn full" id="scp" style="margin-bottom:10px">📷 Escanear item de casa</button>
   ${nF?`<button class="btn sec full" id="gen" style="margin-bottom:12px">⚡ Criar lista com os ${nF} itens que faltam</button>`:""}
   ${its.length?cats.map(c=>`<div class="catH">${esc(c)}</div><div class="list">${its.filter(i=>i.cat===c).map(i=>{const[s,cl]=status(i);return`<div class="li"><div class="grow" data-e="${i.id}"><div class="nm">${esc(i.name)}</div><div class="mu sm">mín. ${fmtN(i.min)} ${esc(i.unit)} · <span class="badge ${cl}">${s}</span></div></div>
   <div class="step"><button data-d="${i.id}" data-v="-1">−</button><span>${fmtN(i.stock)}</span><button data-d="${i.id}" data-v="1">+</button></div></div>`}).join("")}</div>`).join(""):`<div class="empty"><span class="i">✅</span>${panF==="need"?"Nada faltando em casa!":"Cadastre itens na aba Itens."}</div>`}
   <div class="mu sm" style="text-align:center">Toque no nome para editar o mínimo. Ao finalizar uma compra, as quantidades compradas entram aqui.</div>`,
   after(){
     onAll("[data-f]","click",el=>{panF=el.dataset.f;render()});
-    $("#gen")&&($("#gen").onclick=listFromMissing);
+    $("#gen")&&($("#gen").onclick=listFromMissing);$("#scp").onclick=()=>scan(c=>onScanned(c,{t:"pantry"}),"Escanear item de casa");
     onAll("[data-d]","click",el=>{const i=item(el.dataset.d);i.stock=Math.max(0,Math.round(((+i.stock||0)+ +el.dataset.v)*1000)/1000);save();render()});
     onAll("[data-e]","click",el=>itemForm(el.dataset.e));
   }}
@@ -270,6 +388,7 @@ VIEWS.list=()=>{
   const rest=l.budget?l.budget-t.cart:null;
   return{title:l.name,html:`
   <div class="totbar"><div><small>No carrinho</small><b>${money(t.cart)}</b></div><div><small>Previsto total</small><b>${money(t.est)}</b></div>${l.budget?`<div><small>${rest>=0?"Sobra do orçamento":"Acima do orçamento"}</small><b>${money(Math.abs(rest))}</b></div>`:""}</div>
+  <button class="btn full" id="scl" style="margin-bottom:10px;font-size:17px">📷 Escanear código de barras</button>
   <div class="grid2" style="margin-bottom:12px"><button class="btn sec" id="add">＋ Adicionar itens</button><button class="btn" id="fin" ${t.checked?"":"disabled style='opacity:.5'"}>✔ Finalizar compra</button></div>
   ${rows.length?`<div class="list">${rows.map(({e,ix,i})=>`<div class="li ${e.checked?"done":""}">
     <button class="chk ${e.checked?"on":""}" data-k="${ix}">${e.checked?"✓":""}</button>
@@ -279,10 +398,10 @@ VIEWS.list=()=>{
       <input class="price" data-p="${ix}" inputmode="decimal" placeholder="R$ unit." value="${fmtP(e.price)}">
     </div>
     <button class="ic" data-x="${ix}" aria-label="Remover">✕</button></div>`).join("")}</div>`:`<div class="empty"><span class="i">🛒</span>Lista vazia. Toque em “Adicionar itens”.</div>`}
-  <div class="mu sm" style="text-align:center;margin-bottom:12px">Marque ✓ ao colocar no carrinho e ajuste o preço unitário pago.</div>
+  <div class="mu sm" style="text-align:center;margin-bottom:12px">Escaneie o produto ou marque ✓ ao colocar no carrinho e ajuste o preço unitário pago.</div>
   <div class="grid2"><button class="btn ghost" id="ed">✏️ Renomear/orçamento</button><button class="btn danger" id="dl">🗑 Excluir lista</button></div>`,
   after(){
-    $("#add").onclick=()=>addToList(l.id);
+    $("#add").onclick=()=>addToList(l.id);$("#scl").onclick=()=>scan(c=>onScanned(c,{t:"list",lid:l.id}),"Escanear para a lista");
     $("#fin").onclick=()=>t.checked&&finish(l);
     onAll("[data-k]","click",el=>{const e=l.entries[+el.dataset.k];e.checked=!e.checked;save();render()});
     onAll("[data-q]","click",el=>{const e=l.entries[+el.dataset.q];e.qty=Math.max(0,Math.round(((+e.qty||0)+ +el.dataset.v)*1000)/1000);if(e.qty===0)e.qty=1;save();render()});
