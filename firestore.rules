@@ -13,7 +13,7 @@ service cloud.firestore {
     function isMaster() {
       return request.auth != null
         && request.auth.token.email_verified == true
-        && request.auth.token.email in ['MASTER_EMAIL_AQUI'];
+        && request.auth.token.email in ['ti.ederrodrigues@gmail.com'];
     }
     function signedIn() { return request.auth != null; }
 
