@@ -191,10 +191,11 @@ VIEWS.items=()=>{
   <div class="row" style="margin-bottom:10px"><input id="q" placeholder="🔎 Buscar item" value="${esc(itemQ)}"><button class="btn sec" id="scn" style="flex:none" aria-label="Escanear">📷</button><button class="btn" id="add" style="flex:none">＋</button></div>
   <div class="chips"><button class="chip ${!itemCat?"on":""}" data-c="">Todas</button>${S.cats.map(c=>`<button class="chip ${itemCat===c?"on":""}" data-c="${esc(c)}">${esc(c)}</button>`).join("")}</div>
   ${its.length?`<div class="list">${its.map(i=>`<div class="li" data-i="${i.id}"><div class="grow"><div class="nm">${esc(i.name)}</div><div class="mu sm">${esc(i.cat)} · ${esc(i.unit)}${i.price?" · "+money(i.price):""}${i.barcode?" · ▮▮ "+esc(i.barcode):""}</div></div><span class="mu">›</span></div>`).join("")}</div>`:`<div class="empty"><span class="i">🥫</span>Nenhum item encontrado.</div>`}
-  <div class="mu sm" style="text-align:center">${S.items.length} itens cadastrados</div>`,
+  <div class="mu sm" style="text-align:center;margin-bottom:10px">${S.items.length} itens cadastrados</div>
+  <button class="btn sec full" id="sugI">🧺 Adicionar itens sugeridos</button>`,
   after(){
     const qi=$("#q");qi.oninput=()=>{itemQ=qi.value;const p=qi.selectionStart;render();const n=$("#q");n.focus();n.setSelectionRange(p,p)};
-    $("#add").onclick=()=>itemForm(null,itemQ);$("#scn").onclick=()=>scan(c=>onScanned(c,{t:"items"}),"Escanear para cadastrar");
+    $("#add").onclick=()=>itemForm(null,itemQ);$("#sugI").onclick=suggestItems;$("#scn").onclick=()=>scan(c=>onScanned(c,{t:"items"}),"Escanear para cadastrar");
     onAll("[data-c]","click",el=>{itemCat=el.dataset.c;render()});
     onAll("[data-i]","click",el=>itemForm(el.dataset.i));
   }}
@@ -501,6 +502,9 @@ VIEWS.settings=()=>({title:"Opções",html:`
    <div class="grid2"><button class="btn sec" id="exp">⬇️ Salvar backup</button><button class="btn sec" id="cpb">📋 Copiar backup</button></div>
    <div class="grid2" style="margin-top:10px"><button class="btn ghost" id="impf">📂 Restaurar arquivo</button><button class="btn ghost" id="impt">📝 Colar backup</button></div>
    <input type="file" id="file" accept=".json,application/json,text/plain" hidden></div>
+  <h2>Itens</h2>
+  <div class="card"><div class="mu sm" style="margin-bottom:10px">Os itens iniciais são só exemplos. Você pode cadastrar quantos quiser, ou escolher numa lista pronta com mais de 120 produtos comuns.</div>
+   <button class="btn sec full" id="sug">🧺 Adicionar itens sugeridos</button></div>
   <h2>Categorias</h2>
   <div class="list">${S.cats.map((c,i)=>`<div class="li"><div class="grow">${esc(c)}</div><span class="mu sm">${S.items.filter(x=>x.cat===c).length}</span><button class="ic" data-rc="${i}">✕</button></div>`).join("")}</div>
   <div class="row"><input id="nc" placeholder="Nova categoria"><button class="btn" id="addc" style="flex:none">＋</button></div>
@@ -516,6 +520,7 @@ VIEWS.settings=()=>({title:"Opções",html:`
     $("#file").onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(restore)};
     $("#impt").onclick=()=>sheet(`<h3>Colar backup</h3><textarea id="tx" rows="7" placeholder="Cole aqui o texto do backup"></textarea><div class="grid2" style="margin-top:12px"><button class="btn ghost" id="c">Cancelar</button><button class="btn" id="ok">Restaurar</button></div>`,m=>{m.querySelector("#c").onclick=close;m.querySelector("#ok").onclick=()=>{const v=m.querySelector("#tx").value;close();restore(v)}});
     onAll("[data-rc]","click",async el=>{const c=S.cats[+el.dataset.rc];if(S.cats.length<=1)return;if(await ask(`Remover a categoria "${c}"? Os itens dela vão para "Outros".`,"Remover",true)){S.cats.splice(+el.dataset.rc,1);if(!S.cats.includes("Outros"))S.cats.push("Outros");S.items.forEach(i=>{if(i.cat===c)i.cat="Outros"});save();render()}});
+    $("#sug").onclick=suggestItems;
     $("#addc").onclick=()=>{const v=$("#nc").value.trim();if(v&&!S.cats.includes(v)){S.cats.push(v);save();render()}};
     $("#reset").onclick=async()=>{if(await ask("Apagar TODOS os itens, listas e compras? Isso não pode ser desfeito.","Apagar tudo",true)){S=blank();S.seeded=true;save();toast("Dados apagados");stack=[];go("home",null,false)}};
   }});
@@ -547,6 +552,40 @@ addEventListener("appinstalled",()=>{deferredPrompt=null;toast("App instalado!")
 if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
   addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
+/* ----- catálogo sugerido ----- */
+const SUG={
+ "Hortifruti":"Alface:un|Tomate:kg|Cebola:kg|Alho:un|Batata:kg|Cenoura:kg|Banana:kg|Maçã:kg|Laranja:kg|Limão:kg|Mamão:un|Abacaxi:un|Melancia:un|Ovos:dz|Abobrinha:kg|Pimentão:kg|Cheiro-verde:un|Batata-doce:kg|Mandioca:kg|Uva:kg",
+ "Açougue":"Carne moída:kg|Bife:kg|Frango (peito):kg|Coxa/sobrecoxa:kg|Linguiça:kg|Carne de porco:kg|Peixe:kg|Salsicha:pct|Bacon:pct|Costela:kg",
+ "Padaria":"Pão francês:un|Pão de forma:pct|Bolo:un|Bisnaguinha:pct|Torrada:pct|Pão de queijo:pct",
+ "Laticínios":"Leite:L|Manteiga:un|Margarina:un|Queijo mussarela:kg|Presunto:kg|Requeijão:un|Iogurte:un|Creme de leite:un|Leite condensado:un|Queijo ralado:pct|Cream cheese:un",
+ "Mercearia":"Arroz:pct|Feijão:pct|Açúcar:pct|Sal:pct|Café:pct|Óleo:garrafa|Azeite:garrafa|Macarrão:pct|Farinha de trigo:pct|Farinha de mandioca:pct|Fubá:pct|Molho de tomate:un|Extrato de tomate:un|Milho em conserva:lata|Ervilha:lata|Atum:lata|Sardinha:lata|Maionese:un|Ketchup:un|Mostarda:un|Vinagre:garrafa|Achocolatado:un|Biscoito:pct|Bolacha recheada:pct|Aveia:pct|Granola:pct|Fermento:un|Gelatina:un|Tempero pronto:un|Caldo de carne/galinha:un|Chá:cx|Pipoca:pct|Leite em pó:un|Adoçante:un|Mel:un|Geleia:un",
+ "Bebidas":"Água mineral:garrafa|Refrigerante:garrafa|Suco:L|Suco em pó:un|Cerveja:lata|Água com gás:garrafa|Energético:lata",
+ "Limpeza":"Detergente:un|Sabão em pó:cx|Sabão líquido:un|Amaciante:un|Água sanitária:un|Desinfetante:un|Limpador multiuso:un|Esponja:pct|Saco de lixo:pct|Papel toalha:pct|Álcool:un|Lustra-móveis:un|Palha de aço:pct|Pano de chão:un|Inseticida:un|Sabão em barra:pct",
+ "Higiene":"Papel higiênico:pct|Sabonete:un|Shampoo:un|Condicionador:un|Creme dental:un|Escova de dentes:un|Desodorante:un|Fio dental:un|Absorvente:pct|Algodão:pct|Cotonete:cx|Barbeador:un|Fralda:pct|Lenço umedecido:pct|Protetor solar:un",
+ "Congelados":"Pizza congelada:un|Lasanha congelada:un|Hambúrguer:cx|Nuggets:pct|Batata congelada:pct|Sorvete:un|Polpa de fruta:pct|Pão de queijo congelado:pct",
+ "Outros":"Ração para pet:pct|Areia para gato:pct|Pilhas:un|Lâmpada:un|Velas:pct|Fósforo:cx|Filme plástico:un|Papel alumínio:un|Guardanapo:pct|Copos descartáveis:pct"
+};
+function suggestItems(){
+  const have=new Set(S.items.map(i=>i.name.toLowerCase()));
+  const groups=Object.entries(SUG).map(([c,str])=>[c,str.split("|").map(x=>x.split(":")).filter(([n])=>!have.has(n.toLowerCase()))]).filter(g=>g[1].length);
+  if(!groups.length){toast("Você já tem todos os itens sugeridos");return}
+  const sel=new Set();
+  sheet(`<div class="row"><h3 class="grow">Itens sugeridos</h3><button class="ic" id="x">✕</button></div>
+  <div class="mu sm">Toque para marcar. Os itens entram com mínimo 0 (não aparecem como faltando até você definir o mínimo).</div>
+  ${groups.map(([c,its],gi)=>`<div class="row" style="margin-top:12px"><div class="catH grow" style="margin:0">${esc(c)}</div><button class="chip" data-all="${gi}">Todos</button></div>
+   <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${its.map(([n,u])=>`<button class="chip" data-g="${gi}" data-n="${esc(n)}" data-u="${u}" data-c="${esc(c)}">${esc(n)}</button>`).join("")}</div>`).join("")}
+  <div style="position:sticky;bottom:0;background:var(--bg);padding-top:12px"><button class="btn full" id="ok">Adicionar (0)</button></div>`,m=>{
+    const upd=()=>m.querySelector("#ok").textContent=`Adicionar (${sel.size})`;
+    const tog=(b,on)=>{on=on??!b.classList.contains("on");b.classList.toggle("on",on);on?sel.add(b):sel.delete(b)};
+    m.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>{tog(b);upd()});
+    m.querySelectorAll("[data-all]").forEach(a=>a.onclick=()=>{const bs=[...m.querySelectorAll(`[data-g="${a.dataset.all}"]`)],on=!bs.every(b=>b.classList.contains("on"));bs.forEach(b=>tog(b,on));upd()});
+    m.querySelector("#x").onclick=close;
+    m.querySelector("#ok").onclick=()=>{if(!sel.size){toast("Marque ao menos um item");return}
+      sel.forEach(b=>{const c=S.cats.includes(b.dataset.c)?b.dataset.c:(S.cats.includes("Outros")?"Outros":S.cats[0]);S.items.push({id:uid(),name:b.dataset.n,cat:c,unit:b.dataset.u,price:0,min:0,stock:0,barcode:""})});
+      save();close();toast(`${sel.size} itens adicionados`);render()};
+  });
+}
+
 /* ----- botão voltar do celular ----- */
 let armed=false;
 function armBack(){if(armed)return;try{history.pushState({guard:1},"");armed=true}catch(e){}}
