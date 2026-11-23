@@ -20,7 +20,7 @@ Leva cerca de 15 minutos pelo navegador. O plano gratuito do Firebase (Spark) é
 2. Local: **southamerica-east1 (São Paulo)**. O local não pode ser trocado depois.
 3. Escolha **Modo de produção** e toque em **Criar**.
 4. Na aba **Regras**, cole o conteúdo de `firestore.rules`, **trocando `MASTER_EMAIL_AQUI` pelo e-mail Google do Master**, e toque em **Publicar**.
-5. Em **Firestore → TTL** (ou "Política de TTL"), crie uma política para o grupo de coleções `lists` com o campo `expireAt`. Com ela, as listas compartilhadas são apagadas sozinhas, conforme a Política de Privacidade (7 dias após finalizar ou 30 dias sem uso). Se a opção de TTL não aparecer no seu plano, use o botão **Painel Master → Visão geral → Limpar listas expiradas** uma vez por semana.
+5. **Não** crie política de TTL. No plano gratuito (Spark), o TTL exige faturamento ativado e o console responde com erro 403. A exclusão das listas expiradas é feita pelo **Painel Master → Visão geral → Limpar listas expiradas**, uma vez por semana.
 
 ## 4. Registrar o app web
 1. Vá em ⚙️ **Configurações do projeto → Seus apps → Web `</>`**.
