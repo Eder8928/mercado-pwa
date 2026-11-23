@@ -185,7 +185,7 @@ function ask(msg,okTxt="Confirmar",danger=false){return new Promise(res=>{sheet(
 function onAll(sel,ev,fn){document.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,e=>fn(el,e)))}
 
 /* ----- marca ----- */
-const APP_VERSION="2.0.0";
+const APP_VERSION="2.0.1";
 const brandHTML=()=>`<a class="brand" href="https://livrezon.com.br" target="_blank" rel="noopener"><img src="livrezon-selo-96.png" alt="Selo LIVREZON TECNOLOGIA"><span>Desenvolvido por<br><b>LIVREZON TECNOLOGIA</b></span></a><div class="mu sm" style="text-align:center">Minha Lista de Mercado · v${APP_VERSION} · <a href="privacidade.html" style="color:inherit">Privacidade</a> · <a href="termos.html" style="color:inherit">Termos</a></div>`;
 
 /* ---------- telas ---------- */
@@ -498,7 +498,7 @@ function finish(l){
       const h={id:uid(),date:Date.now(),store:m.querySelector("#st").value.trim(),listName:l.name,budget:l.budget||0,total:t.cart,refTotal:bought.reduce((a,e)=>{const i=item(e.itemId);return a+(+e.qty||0)*(+(i&&i.price)||0)},0),missing:left.length,
         entries:bought.map(e=>{const i=item(e.itemId)||{};return{itemId:e.itemId,name:i.name||"?",cat:i.cat||"Outros",unit:i.unit||"un",qty:+e.qty||0,price:+e.price||0,prev:+i.price||0}})};
       bought.forEach(e=>{const i=item(e.itemId);if(!i)return;if(up)i.stock=Math.round(((+i.stock||0)+(+e.qty||0))*1000)/1000;if(pr&&+e.price)i.price=+e.price});
-      if(l.shared&&FB.uid){syncOut(l);FB.m.updateDoc(ref(l.shared.id),{done:true,total:t.cart,doneBy:myName(),store:h.store,updatedAt:FB.m.serverTimestamp(),expireAt:ttl(7)}).catch(()=>toast("Não foi possível avisar os outros participantes"));unsub(l.shared.id)}
+      if(l.shared&&FB.uid){syncOut(l);FB.m.updateDoc(ref(l.shared.id),{done:true,total:t.cart,doneBy:myName(),store:h.store,updatedAt:FB.m.serverTimestamp(),expireAt:ttl(30)}).catch(()=>toast("Não foi possível avisar os outros participantes"));unsub(l.shared.id)}
       S.history.unshift(h);S.lists=S.lists.filter(x=>x.id!==l.id);
       if(kp&&left.length)S.lists.unshift({id:uid(),name:l.name+" (pendentes)",budget:0,created:Date.now(),done:false,entries:left.map(e=>({...e,checked:false}))});
       save();close();stack=[];go("purchase",h.id,false);toast("Compra registrada!");
@@ -656,7 +656,7 @@ function syncOut(l){
   for(const k in l._sync)if(!cur[k]){upd["entries."+k]=FB.m.deleteField();delete l._sync[k];n++}
   const meta=JSON.stringify([l.name,+l.budget||0]);if(l._meta!==meta){upd.name=l.name;upd.budget=+l.budget||0;l._meta=meta;n++}
   if(!n)return;
-  upd.updatedAt=FB.m.serverTimestamp();upd.expireAt=ttl(30);
+  upd.updatedAt=FB.m.serverTimestamp();upd.expireAt=ttl(120);
   FB.m.updateDoc(ref(l.shared.id),upd).catch(e=>{console.warn(e);toast("Falha ao sincronizar a lista")});
   try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
 }
@@ -715,7 +715,7 @@ async function shareList(l){
       sheet(`<div class="empty"><span class="i">🔗</span>Criando lista compartilhada…</div>`);
       try{await fbInit();const id=rid();l._sync={};l._meta=null;
         const cur=curEntries(l),entries={};for(const k in cur){entries[k]={...cur[k],t:Date.now()};l._sync[k]=pack(cur[k])}
-        await FB.m.setDoc(ref(id),{v:1,name:l.name,budget:+l.budget||0,entries,done:false,ownerUid:FB.uid,createdAt:FB.m.serverTimestamp(),updatedAt:FB.m.serverTimestamp(),expireAt:ttl(30)});
+        await FB.m.setDoc(ref(id),{v:1,name:l.name,budget:+l.budget||0,entries,done:false,ownerUid:FB.uid,createdAt:FB.m.serverTimestamp(),updatedAt:FB.m.serverTimestamp(),expireAt:ttl(120)});
         l.shared={id,owner:true};l._meta=JSON.stringify([l.name,+l.budget||0]);save();close();subscribe(l);render();
       }catch(e){close();toast(e.message||"Não foi possível compartilhar");return}
     }
@@ -857,12 +857,12 @@ function pdfHistory(list,label){return withPdf(async()=>{
 })}
 
 /* ----- LGPD: aceite, privacidade ----- */
-const LEGAL_V="1.0";
+const LEGAL_V="1.1";
 function consentHTML(){return `<div class="welcome"><div class="wbox">
   <img src="livrezon-selo-192.png" alt="LIVREZON TECNOLOGIA" class="wlogo">
   <h2>Minha Lista de Mercado</h2>
   <p>Organize suas compras, saiba o que tem em casa, escaneie produtos, compre junto com quem você quiser e acompanhe seus gastos.</p>
-  <ul><li>🔒 Sem cadastro. Seus dados ficam <b>no seu aparelho</b>.</li><li>☁️ Só a lista que você <b>compartilhar</b> vai para a nuvem, e é apagada automaticamente.</li><li>🚫 Sem anúncios e sem rastreadores.</li></ul>
+  <ul><li>🔒 Sem cadastro. Seus dados ficam <b>no seu aparelho</b>.</li><li>☁️ Só a lista que você <b>compartilhar</b> vai para a nuvem, e é apagada depois que deixa de ser usada.</li><li>🚫 Sem anúncios e sem rastreadores.</li></ul>
   <label class="row wchk"><input type="checkbox" id="agree"> <span>Li e concordo com os <a href="termos.html">Termos de Uso</a> e a <a href="privacidade.html">Política de Privacidade</a>.</span></label>
   <button class="btn full" id="start" disabled style="opacity:.5">Começar</button>
   <div class="wsign">Desenvolvido por <b>LIVREZON TECNOLOGIA</b><br><span>Soluções tecnológicas para um futuro real.</span></div></div></div>`}
