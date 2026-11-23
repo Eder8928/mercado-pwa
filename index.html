@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#14804a">
 <title>Minha Lista de Mercado</title>
 <link rel="manifest" href="manifest.webmanifest">
+<script src="firebase-config.js"></script>
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -79,6 +80,8 @@ label{display:block;font-size:14px;color:var(--mu);margin:10px 0 4px}
 .scanline{position:absolute;left:10%;right:10%;top:50%;height:2px;background:#ff4d4d;box-shadow:0 0 8px #ff4d4d;animation:sl 1.6s ease-in-out infinite}
 @keyframes sl{0%,100%{transform:translateY(-38px)}50%{transform:translateY(38px)}}
 .okbox{background:var(--gl);color:var(--g);border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:6px}
+.sharebar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--gl);color:var(--g);font-weight:700;border-radius:12px;padding:9px 12px;margin-bottom:10px}
+.who{color:var(--g);font-weight:700}
 .catH{font-size:13px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.04em;margin:14px 4px 6px}
 </style>
 </head>
@@ -105,7 +108,7 @@ function load(){
   S.items=S.items||[];S.lists=S.lists||[];S.history=S.history||[];S.cats=S.cats&&S.cats.length?S.cats:DEF_CATS.slice();
   if(!S.seeded&&!S.items.length){seed();S.seeded=true;save()}
 }
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S));storageOK=true}catch(e){storageOK=false}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));storageOK=true}catch(e){storageOK=false}queueSync()}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 function seed(){
   [["Arroz","Mercearia","pct",1],["Feijão","Mercearia","pct",1],["Açúcar","Mercearia","pct",1],["Café","Mercearia","pct",1],["Óleo","Mercearia","garrafa",1],["Leite","Laticínios","L",6],["Ovos","Hortifruti","dz",1],["Pão","Padaria","un",0],["Banana","Hortifruti","kg",0],["Papel higiênico","Higiene","pct",1],["Sabão em pó","Limpeza","cx",1],["Detergente","Limpeza","un",2]]
@@ -163,7 +166,7 @@ VIEWS.home=()=>{
   </div>
   ${installHTML()}
   <div style="margin:14px 0"><button class="btn full" id="nova">＋ Nova lista de compras</button></div>
-  ${open.length?`<h2>Listas abertas</h2><div class="list">${open.map(l=>{const t=listTotals(l);return`<div class="li" data-l="${l.id}"><div class="grow"><div class="nm">${esc(l.name)}</div><div class="mu sm">${l.entries.length} itens · ${t.checked}/${l.entries.length} no carrinho</div></div><b>${money(t.est)}</b><span class="mu">›</span></div>`}).join("")}</div>`:""}
+  ${open.length?`<h2>Listas abertas</h2><div class="list">${open.map(l=>{const t=listTotals(l);return`<div class="li" data-l="${l.id}"><div class="grow"><div class="nm">${l.shared?"👥 ":""}${esc(l.name)}</div><div class="mu sm">${l.entries.length} itens · ${t.checked}/${l.entries.length} no carrinho</div></div><b>${money(t.est)}</b><span class="mu">›</span></div>`}).join("")}</div>`:""}
   <h2>Opções</h2>
   <div class="grid2">
     <button class="tile" data-go="lists"><span class="i">📝</span><b>Listas</b><span class="mu sm">Montar e ir às compras</span></button>
@@ -377,9 +380,10 @@ function listFromMissing(){
 VIEWS.lists=()=>{
   const open=S.lists.filter(l=>!l.done);
   return{title:"Listas de compras",html:`<button class="btn full" id="nova" style="margin-bottom:12px">＋ Nova lista</button>
-  ${open.length?`<div class="list">${open.map(l=>{const t=listTotals(l);return`<div class="li" data-l="${l.id}"><div class="grow"><div class="nm">${esc(l.name)}</div><div class="mu sm">${dt(l.created)} · ${l.entries.length} itens · ${t.checked} no carrinho</div></div><b>${money(t.est)}</b><span class="mu">›</span></div>`}).join("")}</div>`:`<div class="empty"><span class="i">📝</span>Nenhuma lista aberta.<br>Crie uma nova ou gere pelo que falta em casa.</div>`}
-  <button class="btn sec full" id="falta">⚡ Gerar lista do que falta em casa</button>`,
-  after(){$("#nova").onclick=newList;$("#falta").onclick=listFromMissing;onAll("[data-l]","click",el=>go("list",el.dataset.l))}}
+  ${open.length?`<div class="list">${open.map(l=>{const t=listTotals(l);return`<div class="li" data-l="${l.id}"><div class="grow"><div class="nm">${l.shared?"👥 ":""}${esc(l.name)}</div><div class="mu sm">${dt(l.created)} · ${l.entries.length} itens · ${t.checked} no carrinho</div></div><b>${money(t.est)}</b><span class="mu">›</span></div>`}).join("")}</div>`:`<div class="empty"><span class="i">📝</span>Nenhuma lista aberta.<br>Crie uma nova ou gere pelo que falta em casa.</div>`}
+  <button class="btn sec full" id="falta">⚡ Gerar lista do que falta em casa</button>
+  ${fbOn()?`<button class="btn ghost full" id="join" style="margin-top:10px">🔗 Entrar em lista compartilhada</button>`:""}`,
+  after(){$("#nova").onclick=newList;$("#falta").onclick=listFromMissing;$("#join")&&($("#join").onclick=joinPrompt);onAll("[data-l]","click",el=>go("list",el.dataset.l))}}
 };
 VIEWS.list=()=>{
   const l=S.lists.find(x=>x.id===param);if(!l){view="lists";return VIEWS.lists()}
@@ -389,27 +393,31 @@ VIEWS.list=()=>{
   const rest=l.budget?l.budget-t.cart:null;
   return{title:l.name,html:`
   <div class="totbar"><div><small>No carrinho</small><b>${money(t.cart)}</b></div><div><small>Previsto total</small><b>${money(t.est)}</b></div>${l.budget?`<div><small>${rest>=0?"Sobra do orçamento":"Acima do orçamento"}</small><b>${money(Math.abs(rest))}</b></div>`:""}</div>
+  ${l.shared?`<div class="sharebar"><span>👥 Lista compartilhada</span><span class="mu sm">${({ok:"☁️ sincronizado",enviando:"⏳ enviando…",offline:"📴 offline — sincroniza ao voltar",erro:"⚠️ erro de conexão"})[FB.st[l.shared.id]]||"⏳ conectando…"}</span></div>`:""}
   <button class="btn full" id="scl" style="margin-bottom:10px;font-size:17px">📷 Escanear código de barras</button>
   <div class="grid2" style="margin-bottom:12px"><button class="btn sec" id="add">＋ Adicionar itens</button><button class="btn" id="fin" ${t.checked?"":"disabled style='opacity:.5'"}>✔ Finalizar compra</button></div>
   ${rows.length?`<div class="list">${rows.map(({e,ix,i})=>`<div class="li ${e.checked?"done":""}">
     <button class="chk ${e.checked?"on":""}" data-k="${ix}">${e.checked?"✓":""}</button>
-    <div class="grow"><div class="nm">${esc(i.name)}</div><div class="mu sm">${esc(i.unit)} · ${money((+e.qty||0)*(+e.price||0))}</div></div>
+    <div class="grow"><div class="nm">${esc(i.name)}</div><div class="mu sm">${esc(i.unit)} · ${money((+e.qty||0)*(+e.price||0))}${l.shared&&e.checked&&e.by?` · <span class="who">✓ ${esc(e.by)}</span>`:""}</div></div>
     <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
       <div class="step"><button data-q="${ix}" data-v="-1">−</button><input data-qi="${ix}" inputmode="decimal" value="${fmtN(e.qty)}"><button data-q="${ix}" data-v="1">+</button></div>
       <input class="price" data-p="${ix}" inputmode="decimal" placeholder="R$ unit." value="${fmtP(e.price)}">
     </div>
     <button class="ic" data-x="${ix}" aria-label="Remover">✕</button></div>`).join("")}</div>`:`<div class="empty"><span class="i">🛒</span>Lista vazia. Toque em “Adicionar itens”.</div>`}
   <div class="mu sm" style="text-align:center;margin-bottom:12px">Escaneie o produto ou marque ✓ ao colocar no carrinho e ajuste o preço unitário pago.</div>
-  <div class="grid2"><button class="btn ghost" id="ed">✏️ Renomear/orçamento</button><button class="btn danger" id="dl">🗑 Excluir lista</button></div>`,
+  ${fbOn()?`<button class="btn sec full" id="shr" style="margin-bottom:10px">👥 ${l.shared?"Convidar mais pessoas":"Compartilhar lista (comprar junto)"}</button>`:""}
+  <div class="grid2"><button class="btn ghost" id="ed">✏️ Renomear/orçamento</button><button class="btn danger" id="dl">🗑 ${l.shared?"Sair da lista":"Excluir lista"}</button></div>`,
   after(){
     $("#add").onclick=()=>addToList(l.id);$("#scl").onclick=()=>scan(c=>onScanned(c,{t:"list",lid:l.id}),"Escanear para a lista");
     $("#fin").onclick=()=>t.checked&&finish(l);
+    $("#shr")&&($("#shr").onclick=()=>l.shared?shareSheet(l):shareList(l));
+    if(l.shared)subscribe(l);
     onAll("[data-k]","click",el=>{const e=l.entries[+el.dataset.k];e.checked=!e.checked;save();render()});
     onAll("[data-q]","click",el=>{const e=l.entries[+el.dataset.q];e.qty=Math.max(0,Math.round(((+e.qty||0)+ +el.dataset.v)*1000)/1000);if(e.qty===0)e.qty=1;save();render()});
     onAll("[data-qi]","change",el=>{const e=l.entries[+el.dataset.qi];e.qty=Math.max(0,num(el.value))||1;save();render()});
     onAll("[data-p]","change",el=>{const e=l.entries[+el.dataset.p];e.price=num(el.value);if(e.price&&!e.checked)e.checked=true;save();render()});
     onAll("[data-x]","click",el=>{l.entries.splice(+el.dataset.x,1);save();render()});
-    $("#dl").onclick=async()=>{if(await ask(`Excluir a lista "${l.name}"?`,"Excluir",true)){S.lists=S.lists.filter(x=>x.id!==l.id);save();stack=[];go("lists",null,false)}};
+    $("#dl").onclick=async()=>{if(await ask(l.shared?`Sair da lista compartilhada "${l.name}"? Ela continua para as outras pessoas.`:`Excluir a lista "${l.name}"?`,l.shared?"Sair":"Excluir",true)){if(l.shared)unsub(l.shared.id);S.lists=S.lists.filter(x=>x.id!==l.id);save();stack=[];go("lists",null,false)}};
     $("#ed").onclick=()=>sheet(`<h3>Editar lista</h3><label>Nome</label><input id="ln" value="${esc(l.name)}"><label>Orçamento (R$)</label><input id="lb" inputmode="decimal" value="${fmtP(l.budget)}">
       <div class="grid2" style="margin-top:16px"><button class="btn ghost" id="c">Cancelar</button><button class="btn" id="ok">Salvar</button></div>`,m=>{m.querySelector("#c").onclick=close;m.querySelector("#ok").onclick=()=>{l.name=m.querySelector("#ln").value.trim()||l.name;l.budget=num(m.querySelector("#lb").value);save();close();render()}});
   }}
@@ -451,6 +459,7 @@ function finish(l){
       const h={id:uid(),date:Date.now(),store:m.querySelector("#st").value.trim(),listName:l.name,budget:l.budget||0,total:t.cart,refTotal:bought.reduce((a,e)=>{const i=item(e.itemId);return a+(+e.qty||0)*(+(i&&i.price)||0)},0),missing:left.length,
         entries:bought.map(e=>{const i=item(e.itemId)||{};return{itemId:e.itemId,name:i.name||"?",cat:i.cat||"Outros",unit:i.unit||"un",qty:+e.qty||0,price:+e.price||0,prev:+i.price||0}})};
       bought.forEach(e=>{const i=item(e.itemId);if(!i)return;if(up)i.stock=Math.round(((+i.stock||0)+(+e.qty||0))*1000)/1000;if(pr&&+e.price)i.price=+e.price});
+      if(l.shared&&FB.m){syncOut(l);FB.m.updateDoc(ref(l.shared.id),{done:true,total:t.cart,doneBy:myName(),store:h.store,updatedAt:FB.m.serverTimestamp()}).catch(()=>toast("Não foi possível avisar os outros participantes"));unsub(l.shared.id)}
       S.history.unshift(h);S.lists=S.lists.filter(x=>x.id!==l.id);
       if(kp&&left.length)S.lists.unshift({id:uid(),name:l.name+" (pendentes)",budget:0,created:Date.now(),done:false,entries:left.map(e=>({...e,checked:false}))});
       save();close();stack=[];go("purchase",h.id,false);toast("Compra registrada!");
@@ -497,6 +506,7 @@ VIEWS.purchase=()=>{
 
 /* ----- opções ----- */
 VIEWS.settings=()=>({title:"Opções",html:`
+  ${fbOn()?`<h2>Lista compartilhada</h2><div class="card"><label style="margin-top:0">Seu nome (aparece para quem compra junto)</label><div class="row"><input id="me" maxlength="20" value="${esc(S.me||"")}" placeholder="Seu nome"><button class="btn" id="meok" style="flex:none">Salvar</button></div></div>`:""}
   <h2>Backup dos dados</h2>
   <div class="card"><div class="mu sm" style="margin-bottom:10px">Seus dados ficam salvos só neste aparelho/navegador. Faça backup de vez em quando ou antes de limpar o navegador ou trocar de celular.</div>
    <div class="grid2"><button class="btn sec" id="exp">⬇️ Salvar backup</button><button class="btn sec" id="cpb">📋 Copiar backup</button></div>
@@ -521,6 +531,7 @@ VIEWS.settings=()=>({title:"Opções",html:`
     $("#impt").onclick=()=>sheet(`<h3>Colar backup</h3><textarea id="tx" rows="7" placeholder="Cole aqui o texto do backup"></textarea><div class="grid2" style="margin-top:12px"><button class="btn ghost" id="c">Cancelar</button><button class="btn" id="ok">Restaurar</button></div>`,m=>{m.querySelector("#c").onclick=close;m.querySelector("#ok").onclick=()=>{const v=m.querySelector("#tx").value;close();restore(v)}});
     onAll("[data-rc]","click",async el=>{const c=S.cats[+el.dataset.rc];if(S.cats.length<=1)return;if(await ask(`Remover a categoria "${c}"? Os itens dela vão para "Outros".`,"Remover",true)){S.cats.splice(+el.dataset.rc,1);if(!S.cats.includes("Outros"))S.cats.push("Outros");S.items.forEach(i=>{if(i.cat===c)i.cat="Outros"});save();render()}});
     $("#sug").onclick=suggestItems;
+    $("#meok")&&($("#meok").onclick=()=>{S.me=$("#me").value.trim().slice(0,20);save();toast("Nome salvo")});
     $("#addc").onclick=()=>{const v=$("#nc").value.trim();if(v&&!S.cats.includes(v)){S.cats.push(v);save();render()}};
     $("#reset").onclick=async()=>{if(await ask("Apagar TODOS os itens, listas e compras? Isso não pode ser desfeito.","Apagar tudo",true)){S=blank();S.seeded=true;save();toast("Dados apagados");stack=[];go("home",null,false)}};
   }});
@@ -552,6 +563,165 @@ addEventListener("appinstalled",()=>{deferredPrompt=null;toast("App instalado!")
 if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
   addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }
+/* ----- lista compartilhada (Firebase) ----- */
+const FB={ready:null,m:null,db:null,uid:null,subs:{},st:{},timer:0};
+const fbOn=()=>!!(window.FIREBASE_CONFIG&&window.FIREBASE_CONFIG.apiKey&&window.FIREBASE_CONFIG.projectId);
+const myName=()=>S.me||"";
+const slug=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,60)||"item";
+const ekey=i=>"k_"+(i.barcode?"b"+cleanCode(i.barcode):slug(i.name));
+function rid(n=24){const a="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789",r=new Uint32Array(n);crypto.getRandomValues(r);return [...r].map(x=>a[x%a.length]).join("")}
+const validId=id=>/^[A-Za-z0-9]{20,40}$/.test(id||"");
+function fbInit(){
+  if(!fbOn())return Promise.reject(new Error("Compartilhamento ainda não configurado."));
+  if(FB.ready)return FB.ready;
+  FB.ready=(async()=>{
+    const m=await import("./fb.js");FB.m=m;
+    const app=m.initializeApp(window.FIREBASE_CONFIG);
+    try{FB.db=m.initializeFirestore(app,{localCache:m.persistentLocalCache({tabManager:m.persistentSingleTabManager()})})}catch(e){FB.db=m.initializeFirestore(app,{})}
+    const auth=m.getAuth(app);
+    await new Promise((res,rej)=>{let first=true;const un=m.onAuthStateChanged(auth,u=>{
+      if(u){FB.uid=u.uid;un();res();return}
+      if(first){first=false;m.signInAnonymously(auth).catch(e=>{un();rej(new Error(navigator.onLine?"Não foi possível conectar ao servidor.":"Sem internet para entrar na lista compartilhada."))})}
+    })});
+  })();
+  FB.ready.catch(()=>{FB.ready=null});
+  return FB.ready;
+}
+const ref=id=>FB.m.doc(FB.db,"lists",id);
+function curEntries(l){
+  const prev=l._sync||{},out={};
+  l.entries.forEach(e=>{const i=item(e.itemId);if(!i)return;const k=ekey(i);let p=null;try{p=prev[k]&&JSON.parse(prev[k])}catch(x){}
+    if(e.checked&&!(p&&p.ck&&e.by))e.by=myName();if(!e.checked)e.by="";
+    out[k]={n:i.name,c:i.cat,u:i.unit,b:i.barcode||"",q:+e.qty||0,p:+e.price||0,ck:!!e.checked,by:e.by||""}});
+  return out;
+}
+const pack=r=>JSON.stringify({n:r.n,c:r.c,u:r.u,b:r.b||"",q:+r.q||0,p:+r.p||0,ck:!!r.ck,by:r.by||""});
+function queueSync(){if(!fbOn()||!S||!S.lists.some(l=>l.shared&&!l.done))return;clearTimeout(FB.timer);FB.timer=setTimeout(syncAll,450)}
+function syncAll(){if(!FB.m)return fbInit().then(syncAll).catch(()=>{});S.lists.filter(l=>l.shared&&!l.done).forEach(syncOut)}
+function syncOut(l){
+  if(!FB.m||!l.shared)return;
+  l._sync=l._sync||{};const cur=curEntries(l),upd={};let n=0;
+  for(const k in cur){const j=pack(cur[k]);if(l._sync[k]!==j){upd["entries."+k]={...cur[k],t:Date.now()};l._sync[k]=j;n++}}
+  for(const k in l._sync)if(!cur[k]){upd["entries."+k]=FB.m.deleteField();delete l._sync[k];n++}
+  const meta=JSON.stringify([l.name,+l.budget||0]);if(l._meta!==meta){upd.name=l.name;upd.budget=+l.budget||0;l._meta=meta;n++}
+  if(!n)return;
+  upd.updatedAt=FB.m.serverTimestamp();
+  FB.m.updateDoc(ref(l.shared.id),upd).catch(e=>{console.warn(e);toast("Falha ao sincronizar a lista")});
+  try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+}
+function localItemFor(r){
+  let i=(r.b&&byCode(r.b))||S.items.find(x=>x.name.toLowerCase()===String(r.n||"").toLowerCase());
+  if(!i){i={id:uid(),name:String(r.n||"Item").slice(0,80),cat:S.cats.includes(r.c)?r.c:(S.cats.includes("Outros")?"Outros":S.cats[0]),unit:UNITS.includes(r.u)?r.u:"un",price:+r.p||0,min:0,stock:0,barcode:r.b?cleanCode(r.b):""};S.items.push(i)}
+  else if(r.b&&!i.barcode&&!byCode(r.b))i.barcode=cleanCode(r.b);
+  return i;
+}
+function subscribe(l){
+  if(!l.shared||FB.subs[l.shared.id])return;
+  fbInit().then(()=>{
+    const id=l.shared.id;
+    FB.subs[id]=FB.m.onSnapshot(ref(id),{includeMetadataChanges:true},snap=>{
+      const L=S.lists.find(x=>x.shared&&x.shared.id===id);if(!L){unsub(id);return}
+      FB.st[id]=snap.metadata.hasPendingWrites?"enviando":snap.metadata.fromCache?"offline":"ok";
+      if(!snap.exists()){softRender();return}
+      const d=snap.data(),remote=d.entries||{};
+      // mudanças locais ainda não enviadas têm prioridade
+      const cur=curEntries(L),pending=new Set();
+      for(const k in cur)if((L._sync||{})[k]!==pack(cur[k]))pending.add(k);
+      for(const k in (L._sync||{}))if(!cur[k])pending.add(k);
+      const keep=L.entries.filter(e=>{const i=item(e.itemId);return i&&pending.has(ekey(i))});
+      const nextSync={},list=[...keep];
+      for(const k in remote){const r=remote[k];if(pending.has(k)){if((L._sync||{})[k]!==undefined)nextSync[k]=L._sync[k];continue}
+        const i=localItemFor(r);list.push({itemId:i.id,qty:+r.q||1,price:+r.p||0,checked:!!r.ck,by:r.by||""});nextSync[k]=pack(r)}
+      L.entries=list;L._sync=nextSync;
+      if(d.name)L.name=d.name;L.budget=+d.budget||0;L._meta=JSON.stringify([L.name,L.budget]);
+      if(d.done&&!L.done){remoteFinished(L,d);return}
+      try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+      if(pending.size)syncOut(L);
+      softRender();
+    },err=>{console.warn(err);FB.st[id]="erro";softRender()});
+  }).catch(e=>{FB.st[l.shared.id]="offline"});
+}
+function unsub(id){if(FB.subs[id]){try{FB.subs[id]()}catch(e){}delete FB.subs[id]}}
+let pendingRender=false;
+function softRender(){if(!["list","lists","home"].includes(view))return;
+  const a=document.activeElement;if(a&&a.matches&&a.matches("#app input, #layer input, #layer textarea, #layer select")||$("#layer").firstChild){pendingRender=true;return}
+  render()}
+document.addEventListener("focusout",()=>setTimeout(()=>{if(pendingRender&&!$("#layer").firstChild){const a=document.activeElement;if(!(a&&a.matches&&a.matches("#app input"))){pendingRender=false;render()}}},50));
+function askName(cb){
+  if(myName()){cb();return}
+  sheet(`<h3>Como você se chama?</h3><div class="mu sm">Aparece para quem compartilha a lista com você (ex.: quem pegou cada item).</div>
+  <input id="nm" maxlength="20" placeholder="Seu nome" style="margin-top:10px"><div class="grid2" style="margin-top:14px"><button class="btn ghost" id="c">Cancelar</button><button class="btn" id="ok">Continuar</button></div>`,m=>{
+    const i=m.querySelector("#nm");i.focus();m.querySelector("#c").onclick=close;
+    m.querySelector("#ok").onclick=()=>{const v=i.value.trim().slice(0,20);if(!v){toast("Digite seu nome");return}S.me=v;save();close();cb()};
+  });
+}
+function shareLink(id){return location.origin+location.pathname.replace(/index\.html$/,"")+"#j-"+id}
+async function shareList(l){
+  if(!fbOn()){toast("Compartilhamento ainda não configurado");return}
+  askName(async()=>{
+    if(!l.shared){
+      if(!navigator.onLine){toast("Conecte-se à internet para compartilhar");return}
+      sheet(`<div class="empty"><span class="i">🔗</span>Criando lista compartilhada…</div>`);
+      try{await fbInit();const id=rid();l._sync={};l._meta=null;
+        const cur=curEntries(l),entries={};for(const k in cur){entries[k]={...cur[k],t:Date.now()};l._sync[k]=pack(cur[k])}
+        await FB.m.setDoc(ref(id),{v:1,name:l.name,budget:+l.budget||0,entries,done:false,createdAt:FB.m.serverTimestamp(),updatedAt:FB.m.serverTimestamp()});
+        l.shared={id,owner:true};l._meta=JSON.stringify([l.name,+l.budget||0]);save();close();subscribe(l);render();
+      }catch(e){close();toast(e.message||"Não foi possível compartilhar");return}
+    }
+    shareSheet(l);
+  });
+}
+function shareSheet(l){
+  const link=shareLink(l.shared.id),msg=`🛒 Vamos fazer as compras juntos! Abra a lista "${l.name}" no app Minha Lista de Mercado: ${link}`;
+  sheet(`<h3>👥 Lista compartilhada</h3><div class="mu sm">Quem abrir este link entra na lista. Todos marcam itens e preços, e o total da compra soma o carrinho de todos.</div>
+  <div class="card" style="margin-top:10px;word-break:break-all;font-size:14px">${esc(link)}</div>
+  <a class="btn full" style="text-decoration:none;margin-bottom:8px;background:#25D366" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">Enviar pelo WhatsApp</a>
+  <div class="grid2"><button class="btn sec" id="sh">📤 Compartilhar…</button><button class="btn sec" id="cp">📋 Copiar link</button></div>
+  <div class="mu sm" style="margin-top:10px">Código: <b>${esc(l.shared.id)}</b><br>Envie só para quem você confia: quem tiver o link pode ver e editar esta lista.</div>
+  <button class="btn ghost full" id="x" style="margin-top:12px">Fechar</button>`,m=>{
+    m.querySelector("#x").onclick=close;m.querySelector("#cp").onclick=()=>copy(link,"Link copiado");
+    const sh=m.querySelector("#sh");if(!navigator.share)sh.hidden=true;else sh.onclick=()=>navigator.share({title:"Lista de compras",text:msg}).catch(()=>{});
+  });
+}
+function joinPrompt(){
+  if(!fbOn()){toast("Compartilhamento ainda não configurado");return}
+  sheet(`<h3>Entrar em lista compartilhada</h3><label>Cole o link ou o código recebido</label><input id="cd" placeholder="Link ou código">
+  <div class="grid2" style="margin-top:14px"><button class="btn ghost" id="c">Cancelar</button><button class="btn" id="ok">Entrar</button></div>`,m=>{
+    m.querySelector("#c").onclick=close;
+    m.querySelector("#ok").onclick=()=>{const v=m.querySelector("#cd").value.trim(),id=(v.match(/#j-([A-Za-z0-9]{20,40})/)||[])[1]||v;if(!validId(id)){toast("Código inválido");return}close();joinList(id)};
+  });
+}
+function joinList(id){
+  if(!validId(id))return;
+  const ex=S.lists.find(l=>l.shared&&l.shared.id===id&&!l.done);if(ex){stack=[];go("list",ex.id,false);return}
+  if(!fbOn()){toast("Compartilhamento ainda não configurado");return}
+  askName(async()=>{
+    sheet(`<div class="empty"><span class="i">🔗</span>Entrando na lista…</div>`);
+    try{await fbInit();const s=await FB.m.getDoc(ref(id));close();
+      if(!s.exists()){toast("Lista não encontrada");return}
+      const d=s.data();if(d.done){toast("Essa compra já foi finalizada");return}
+      const l={id:uid(),name:d.name||"Lista compartilhada",budget:+d.budget||0,created:Date.now(),done:false,entries:[],shared:{id,owner:false},_sync:{}};
+      S.lists.unshift(l);save();subscribe(l);stack=[];go("list",l.id,false);toast("Você entrou na lista 👥");
+    }catch(e){close();toast(e.message||"Não foi possível entrar na lista")}
+  });
+}
+function remoteFinished(L,d){
+  unsub(L.shared.id);
+  const bought=L.entries.filter(e=>e.checked);
+  const h={id:uid(),date:Date.now(),store:d.store||"",listName:L.name,budget:L.budget||0,total:+d.total||listTotals(L).cart,refTotal:0,missing:L.entries.length-bought.length,by:d.doneBy||"",
+    entries:bought.map(e=>{const i=item(e.itemId)||{};return{itemId:e.itemId,name:i.name||"?",cat:i.cat||"Outros",unit:i.unit||"un",qty:+e.qty||0,price:+e.price||0,prev:+i.price||0}})};
+  S.history.unshift(h);S.lists=S.lists.filter(x=>x.id!==L.id);save();
+  const onList=view==="list"&&param===L.id;
+  sheet(`<h3>✅ Compra finalizada${d.doneBy?" por "+esc(d.doneBy):""}</h3><div class="big" style="text-align:center">${money(h.total)}</div>
+  <div class="mu sm" style="text-align:center">${bought.length} itens · registrada no seu histórico</div>
+  <button class="btn sec full" id="st" style="margin-top:14px">➕ Somar os itens ao meu "Em casa"</button>
+  <button class="btn full" id="ok" style="margin-top:8px">Ver resultado</button>`,m=>{
+    m.querySelector("#st").onclick=()=>{bought.forEach(e=>{const i=item(e.itemId);if(i)i.stock=Math.round(((+i.stock||0)+(+e.qty||0))*1000)/1000});save();toast("Estoque atualizado");m.querySelector("#st").disabled=true;m.querySelector("#st").style.opacity=.5};
+    m.querySelector("#ok").onclick=()=>{close();stack=[];go("purchase",h.id,false)};
+  });
+  if(!onList&&view!=="purchase")render();
+}
+
 /* ----- catálogo sugerido ----- */
 const SUG={
  "Hortifruti":"Alface:un|Tomate:kg|Cebola:kg|Alho:un|Batata:kg|Cenoura:kg|Banana:kg|Maçã:kg|Laranja:kg|Limão:kg|Mamão:un|Abacaxi:un|Melancia:un|Ovos:dz|Abobrinha:kg|Pimentão:kg|Cheiro-verde:un|Batata-doce:kg|Mandioca:kg|Uva:kg",
@@ -610,6 +780,12 @@ try{history.replaceState({root:1},"")}catch(e){}
 armBack();
 addEventListener("pointerdown",()=>{if(!armed&&!$("#layer [data-exit]"))armBack()},true);
 load();render();
+(function bootShare(){
+  const m=location.hash.match(/^#j-([A-Za-z0-9]{20,40})$/);
+  if(m){try{history.replaceState({root:1},"",location.pathname)}catch(e){}joinList(m[1])}
+  if(fbOn()&&S.lists.some(l=>l.shared&&!l.done))S.lists.filter(l=>l.shared&&!l.done).forEach(subscribe);
+  addEventListener("online",()=>{if(S.lists.some(l=>l.shared&&!l.done)){S.lists.filter(l=>l.shared&&!l.done).forEach(subscribe);syncAll()}});
+})();
 </script>
 </body>
 </html>
