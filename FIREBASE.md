@@ -44,3 +44,8 @@ Leva cerca de 15 minutos pelo navegador. O plano gratuito do Firebase (Spark) é
 | `firestore.rules` | Regras de segurança do banco |
 | `master.html` | Painel Master (`/master`) |
 | `privacidade.html` / `termos.html` | Política de Privacidade e Termos de Uso (LGPD) |
+
+## Fase 1 (v3): conta Google e família
+1. Firestore → **Regras**: cole o conteúdo atualizado de `firestore.rules` e publique. Ele é compatível com o app em produção.
+2. Abra `/seguranca-teste.html` e rode os dois testes. Todos devem dar BLOQUEADO ou OK.
+3. Para liberar a família a alguém antes da cobrança (Fase 2): **Painel Master → Contas e Premium → buscar e-mail → Conceder Premium**.
