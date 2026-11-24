@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://mercado-livrezon.firebaseapp.com; frame-src https://mercado-livrezon.firebaseapp.com https://accounts.google.com https://apis.google.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="author" content="Eder Rodrigues — LIVREZON TECNOLOGIA">
+<title>Teste de segurança · Minha Lista de Mercado</title>
+<script src="firebase-config.js"></script>
+<style>
+body{margin:0;background:#061430;color:#eef2f9;font:15px/1.45 system-ui,sans-serif}
+header{background:#0B1E40;border-bottom:3px solid #D4A02A;padding:14px 18px;display:flex;gap:12px;align-items:center}header img{width:40px;border-radius:50%}
+main{max-width:900px;margin:0 auto;padding:18px}.card{background:#0f2140;border:1px solid #22355a;border-radius:14px;padding:16px;margin-bottom:16px}
+h1{font-size:18px;margin:0}h2{font-size:16px;color:#F2C861;margin:0 0 10px}.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:700;background:#D4A02A;color:#061430;cursor:pointer}
+table{width:100%;border-collapse:collapse;font-size:13.5px}td{padding:7px;border-bottom:1px solid #22355a;vertical-align:top}.ok{color:#4cc184;font-weight:700}.bad{color:#ff6b61;font-weight:700}.mu{color:#9fb0cc}
+</style>
+</head>
+<body>
+<header><img src="livrezon-selo-96.png" alt=""><div><h1>Teste de segurança (invasão simulada)</h1><div class="mu">Minha Lista de Mercado · LIVREZON TECNOLOGIA</div></div></header>
+<main>
+<div class="card"><h2>Como usar</h2>
+<p>Esta página tenta, contra o banco real, ações que um invasor faria. Cada ataque deve aparecer como <span class="ok">BLOQUEADO</span>. Os testes de controle (ações permitidas) devem aparecer como <span class="ok">OK</span>. A página apaga o que criar.</p>
+<p>1) Rode o <b>teste anônimo</b>. 2) Rode o <b>teste com conta Google</b> usando uma conta que <b>não seja</b> a do Master (ex.: uma conta secundária ou da sua esposa).</p>
+<button class="btn" id="a">▶ Teste anônimo</button> <button class="btn" id="g">▶ Teste com conta Google (não Master)</button>
+<p id="sum" class="mu"></p></div>
+<div class="card"><h2>Resultados</h2><table id="out"><tr><td class="mu">Nenhum teste executado.</td></tr></table></div>
+</main>
+<script type="module">
+if(window.top!==window.self){document.documentElement.innerHTML="";throw new Error("framed")}
+const F=await import("./fb.js");
+const app=F.initializeApp(window.FIREBASE_CONFIG),db=F.initializeFirestore(app,{}),auth=F.getAuth(app);
+const out=document.getElementById("out"),sum=document.getElementById("sum");let pass=0,fail=0;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const rid=n=>{const a="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789",r=crypto.getRandomValues(new Uint32Array(n));return[...r].map(x=>a[x%a.length]).join("")};
+function row(name,ok,detail){ok?pass++:fail++;out.insertAdjacentHTML("beforeend",`<tr><td>${esc(name)}</td><td class="${ok?"ok":"bad"}">${ok?(detail==="ok"?"OK":"BLOQUEADO"):"FALHA DE SEGURANÇA"}</td><td class="mu">${esc(detail)}</td></tr>`);sum.textContent=`${pass} aprovado(s), ${fail} falha(s)`}
+async function deny(name,fn,also){try{await fn();row(name,false,"a ação foi PERMITIDA")}catch(e){row(name,e.code==="permission-denied"||e.code===also,""+(e.code||e.message))}}
+async function allow(name,fn){try{await fn();row(name,true,"ok")}catch(e){row(name,false,"controle falhou: "+(e.code||e.message))}}
+const d=(...p)=>F.doc(db,...p),c=(...p)=>F.collection(db,...p),T=F.Timestamp;
+
+document.getElementById("a").onclick=async()=>{
+  out.innerHTML="";pass=fail=0;
+  await F.signOut(auth).catch(()=>{});await F.signInAnonymously(auth);const me=auth.currentUser.uid;
+  await deny("Anônimo lista todas as famílias",()=>F.getDocs(c("households")));
+  await deny("Anônimo lista todas as contas",()=>F.getDocs(c("users")));
+  await deny("Anônimo lista as listas compartilhadas",()=>F.getDocs(c("lists")));
+  await deny("Anônimo cria família",()=>F.setDoc(d("households",me),{ownerUid:me,members:{[me]:true},name:"x",createdAt:F.serverTimestamp()}));
+  await deny("Anônimo lê itens de uma família",()=>F.getDocs(c("households","AAAA","items")));
+  await deny("Anônimo grava item numa família",()=>F.setDoc(d("households","AAAA","items","x"),{name:"x",cat:"x",unit:"un",price:1,min:0,stock:0,barcode:"",t:1,by:me}));
+  await deny("Anônimo liga o modo manutenção",()=>F.setDoc(d("config","app"),{maintenance:true}));
+  await deny("Anônimo escreve no log de auditoria",()=>F.addDoc(c("audit"),{at:F.serverTimestamp(),email:"x",action:"x",target:"x",reason:"xxxx",details:""}));
+  await deny("Anônimo grava em coleção desconhecida",()=>F.setDoc(d("hack","x"),{a:1}));
+  const lid=rid(24);
+  await allow("Controle: cria lista compartilhada válida",()=>F.setDoc(d("lists",lid),{v:1,name:"teste",budget:0,entries:{},done:false,ownerUid:me,createdAt:F.serverTimestamp(),updatedAt:F.serverTimestamp(),expireAt:T.fromMillis(Date.now()+864e5)}));
+  await deny("Lista com dono falso",()=>F.setDoc(d("lists",rid(24)),{v:1,name:"x",entries:{},done:false,ownerUid:"outro"}));
+  await deny("Lista com campo extra (injeção)",()=>F.updateDoc(d("lists",lid),{admin:true}));
+  await deny("Lista com nome gigante",()=>F.updateDoc(d("lists",lid),{name:"x".repeat(500)}));
+  await deny("Lista com valor negativo",()=>F.updateDoc(d("lists",lid),{total:-50}));
+  await deny("Troca o dono da lista",()=>F.updateDoc(d("lists",lid),{ownerUid:"outro"}));
+  await allow("Controle: apaga a própria lista",()=>F.deleteDoc(d("lists",lid)));
+  await F.signOut(auth);
+};
+
+document.getElementById("g").onclick=async()=>{
+  out.innerHTML="";pass=fail=0;
+  try{await F.signInWithPopup(auth,new F.GoogleAuthProvider())}catch(e){row("Login Google",false,e.code||e.message);return}
+  const u=auth.currentUser,me=u.uid;
+  if((window.MASTER_EMAILS||[]).includes((u.email||"").toLowerCase())){row("Conta usada",false,"use uma conta que NÃO seja a do Master");await F.signOut(auth);return}
+  const H=d("households",me),fake=rid(28);
+  let had=false;try{had=(await F.getDoc(H)).exists()}catch(e){}
+  if(!had)await allow("Controle: cria a própria família",()=>F.setDoc(H,{ownerUid:me,members:{[me]:true},name:"Teste",createdAt:F.serverTimestamp()}));
+  await deny("Cria família com id de outra pessoa",()=>F.setDoc(d("households",fake),{ownerUid:me,members:{[me]:true},name:"x",createdAt:F.serverTimestamp()}));
+  await deny("Cria família já com Premium",()=>F.setDoc(d("households",fake),{ownerUid:fake,members:{[me]:true},name:"x",createdAt:F.serverTimestamp(),plan:"premium"}));
+  await deny("Se autopromove a Premium",()=>F.updateDoc(H,{plan:"premium",planUntil:T.fromMillis(Date.now()+365*864e5)}));
+  await deny("Adiciona um estranho à família",()=>F.updateDoc(H,{["members."+fake]:true}));
+  await deny("Transfere a família para outro dono",()=>F.updateDoc(H,{ownerUid:fake}));
+  await deny("Cria convite sem ser Premium",()=>F.setDoc(d("households",me,"invites",rid(24)),{expiresAt:T.fromMillis(Date.now()+3600e3),createdAt:F.serverTimestamp()}));
+  await deny("Entra em família alheia sem convite",()=>F.updateDoc(d("households",fake),{["members."+me]:true,lastInvite:rid(24)}),"not-found");
+  await deny("Lê família alheia",()=>F.getDoc(d("households",fake)));
+  await deny("Lê itens de família alheia",()=>F.getDocs(c("households",fake,"items")));
+  await deny("Lista todas as famílias",()=>F.getDocs(c("households")));
+  await deny("Lista todas as contas",()=>F.getDocs(c("users")));
+  await deny("Lê a conta de outra pessoa",()=>F.getDoc(d("users",fake)));
+  await deny("Perfil com e-mail de outra pessoa",()=>F.setDoc(d("users",me),{email:"vitima@gmail.com",name:"x",householdId:me,updatedAt:F.serverTimestamp()}));
+  await deny("Perfil apontando para família alheia",()=>F.setDoc(d("users",me),{email:u.email,name:"x",householdId:fake,updatedAt:F.serverTimestamp()}));
+  const it=d("households",me,"items","sec-test");
+  await allow("Controle: grava item válido",()=>F.setDoc(it,{name:"Teste",cat:"Outros",unit:"un",price:1.5,min:0,stock:1,barcode:"",t:Date.now(),by:me}));
+  await deny("Item com nome gigante",()=>F.setDoc(it,{name:"x".repeat(200),cat:"Outros",unit:"un",price:1,min:0,stock:0,barcode:"",t:Date.now(),by:me}));
+  await deny("Item com preço negativo",()=>F.setDoc(it,{name:"x",cat:"Outros",unit:"un",price:-1,min:0,stock:0,barcode:"",t:Date.now(),by:me}));
+  await deny("Item com campo extra (injeção)",()=>F.setDoc(it,{name:"x",cat:"Outros",unit:"un",price:1,min:0,stock:0,barcode:"",t:Date.now(),by:me,admin:true}));
+  await deny("Item assinado por outra pessoa",()=>F.setDoc(it,{name:"x",cat:"Outros",unit:"un",price:1,min:0,stock:0,barcode:"",t:Date.now(),by:fake}));
+  await deny("Histórico com 1000 itens (abuso)",()=>F.setDoc(d("households",me,"history","sec-test"),{date:Date.now(),store:"",listName:"",budget:0,total:1,refTotal:0,missing:0,by:"",entries:Array(1000).fill({}),t:Date.now(),uid:me}));
+  await deny("Liga o modo manutenção",()=>F.setDoc(d("config","app"),{maintenance:true}));
+  await deny("Lê o log de auditoria",()=>F.getDocs(c("audit")));
+  await deny("Grava no log de auditoria",()=>F.addDoc(c("audit"),{at:F.serverTimestamp(),email:u.email,action:"x",target:"x",reason:"xxxx",details:""}));
+  await allow("Controle: apaga o item de teste",()=>F.deleteDoc(it));
+  if(!had)await allow("Controle: apaga a família de teste",()=>F.deleteDoc(H));
+  await F.signOut(auth);
+};
+</script>
+</body>
+</html>
