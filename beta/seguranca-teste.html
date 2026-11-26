@@ -39,7 +39,9 @@ async function deny(name,fn,also){try{await fn();row(name,false,"a ação foi PE
 async function allow(name,fn){try{await fn();row(name,true,"ok")}catch(e){row(name,false,"controle falhou: "+(e.code||e.message))}}
 const d=(...p)=>F.doc(db,...p),c=(...p)=>F.collection(db,...p),T=F.Timestamp;
 
+let busy=false;const lock=on=>{busy=on;["a","g"].forEach(i=>{const b=document.getElementById(i);b.disabled=on;b.style.opacity=on?.5:1})};
 document.getElementById("a").onclick=async()=>{
+  if(busy)return;lock(true);try{
   out.innerHTML="";pass=fail=0;
   await F.signOut(auth).catch(()=>{});await F.signInAnonymously(auth);const me=auth.currentUser.uid;
   await deny("Anônimo lista todas as famílias",()=>F.getDocs(c("households")));
@@ -60,9 +62,11 @@ document.getElementById("a").onclick=async()=>{
   await deny("Troca o dono da lista",()=>F.updateDoc(d("lists",lid),{ownerUid:"outro"}));
   await allow("Controle: apaga a própria lista",()=>F.deleteDoc(d("lists",lid)));
   await F.signOut(auth);
+  }finally{lock(false)}
 };
 
 document.getElementById("g").onclick=async()=>{
+  if(busy)return;lock(true);try{
   out.innerHTML="";pass=fail=0;
   try{await F.signInWithPopup(auth,new F.GoogleAuthProvider())}catch(e){row("Login Google",false,e.code||e.message);return}
   const u=auth.currentUser,me=u.uid;
@@ -97,6 +101,7 @@ document.getElementById("g").onclick=async()=>{
   await allow("Controle: apaga o item de teste",()=>F.deleteDoc(it));
   if(!had)await allow("Controle: apaga a família de teste",()=>F.deleteDoc(H));
   await F.signOut(auth);
+  }finally{lock(false)}
 };
 </script>
 </body>
