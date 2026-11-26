@@ -48,6 +48,7 @@ code{background:var(--navy2);padding:1px 6px;border-radius:6px}
 <footer>Acesso restrito · Todas as ações ficam registradas no log de auditoria imutável.<br>Desenvolvido por Eder Rodrigues — LIVREZON TECNOLOGIA</footer>
 <div id="layer"></div>
 <script type="module">
+if(window.top!==window.self){document.documentElement.innerHTML="";throw new Error("framed")}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const ms=t=>t&&t.toMillis?t.toMillis():(typeof t==="number"?t:0);
@@ -92,9 +93,9 @@ F.onAuthStateChanged(auth,async u=>{
 
 let tab="geral";
 function shell(){
-  $("#app").innerHTML=`<div class="tabs">${[["geral","📊 Visão geral"],["listas","🗂️ Listas"],["config","🛠️ Manutenção"],["backup","💾 Master Backup"],["audit","📜 Auditoria"]].map(([k,t])=>`<button data-t="${k}" class="${tab===k?"on":""}">${t}</button>`).join("")}</div><div id="tab"></div>`;
+  $("#app").innerHTML=`<div class="tabs">${[["geral","📊 Visão geral"],["contas","⭐ Contas e Premium"],["listas","🗂️ Listas"],["config","🛠️ Manutenção"],["backup","💾 Master Backup"],["audit","📜 Auditoria"]].map(([k,t])=>`<button data-t="${k}" class="${tab===k?"on":""}">${t}</button>`).join("")}</div><div id="tab"></div>`;
   document.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{tab=b.dataset.t;shell()});
-  ({geral,listas,config,backup,auditView})[tab==="audit"?"auditView":tab]();
+  ({geral,contas,listas,config,backup,auditView})[tab==="audit"?"auditView":tab]();
 }
 const lists=()=>F.collection(db,"lists");
 async function count(q){try{return (await F.getCountFromServer(q)).data().count}catch(e){return "?"}}
@@ -162,6 +163,28 @@ async function config(){
     try{await audit("config",`app`,r,JSON.stringify({maintenance:n.maintenance,message:n.message,minVersion:n.minVersion}));await F.setDoc(F.doc(db,"config","app"),n);toast("Configuração salva")}catch(e){toast("Falha: "+(e.code||e.message))}};
 }
 
+async function contas(){
+  const H=F.collection(db,"households");
+  $("#tab").innerHTML=`<div class="card"><h2>Contas Google</h2><div class="grid" id="ck"><div class="mu">Calculando…</div></div></div>
+  <div class="card"><h2>Buscar conta por e-mail</h2><div class="row"><input id="em" class="grow" type="email" placeholder="email@gmail.com"><button class="btn" id="bs">Buscar</button></div><div id="cr" style="margin-top:12px"></div></div>`;
+  const [u,h,p]=await Promise.all([count(F.collection(db,"users")),count(H),count(F.query(H,F.where("plan","==","premium")))]);
+  $("#ck").innerHTML=[["Contas",u],["Famílias",h],["Premium (registro)",p]].map(([t,v])=>`<div class="kpi"><b>${v}</b><span>${t}</span></div>`).join("");
+  $("#bs").onclick=async()=>{const em=$("#em").value.trim().toLowerCase();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){toast("E-mail inválido");return}
+    try{const q=await F.getDocs(F.query(F.collection(db,"users"),F.where("email","==",em),F.limit(5)));
+      if(q.empty){$("#cr").innerHTML='<p class="mu">Nenhuma conta com esse e-mail.</p>';return}
+      const rows=[];for(const d of q.docs){const ud=d.data(),hid=ud.householdId||d.id;let hd=null;try{const x=await F.getDoc(F.doc(db,"households",hid));hd=x.exists()?x.data():null}catch(e){}rows.push({uid:d.id,ud,hid,hd})}
+      $("#cr").innerHTML=rows.map(r=>{const prem=r.hd&&r.hd.plan==="premium"&&ms(r.hd.planUntil)>Date.now();return`<div class="card" style="background:var(--navy2)">
+        <div><b>${esc(r.ud.email)}</b> <span class="tag">${r.hd&&r.hd.ownerUid===r.uid?"dono da família":"membro"}</span></div>
+        <div class="mu">Família: ${esc(r.hd?r.hd.name:"—")} · ${r.hd?Object.keys(r.hd.members||{}).length:0} pessoa(s) · Plano: ${prem?'<span class="ok">Premium até '+dth(r.hd.planUntil)+'</span>':"Grátis"}${r.hd&&r.hd.planSource?" ("+esc(r.hd.planSource)+")":""}</div>
+        <div class="row" style="margin-top:10px">${r.hd?`<select data-m="${esc(r.hid)}" style="width:auto"><option value="1">1 mês</option><option value="3">3 meses</option><option value="12">12 meses</option></select><button class="btn" data-g="${esc(r.hid)}">Conceder Premium</button><button class="btn dan" data-r="${esc(r.hid)}">Remover Premium</button>`:""}</div></div>`}).join("");
+      document.querySelectorAll("[data-g]").forEach(b=>b.onclick=async()=>{const hid=b.dataset.g,mo=+document.querySelector(`[data-m="${CSS.escape(hid)}"]`).value;
+        const r=await askReason(`Conceder Premium por ${mo} mês(es)`,"Conceder");if(!r)return;
+        try{await audit("grant_premium",hid,r,mo+" mes(es)");await F.updateDoc(F.doc(db,"households",hid),{plan:"premium",planUntil:F.Timestamp.fromMillis(Date.now()+mo*30*864e5),planSource:"master"});toast("Premium concedido");$("#bs").click()}catch(e){toast("Falha: "+(e.code||e.message))}});
+      document.querySelectorAll("[data-r]").forEach(b=>b.onclick=async()=>{const hid=b.dataset.r;const r=await askReason("Remover Premium","Remover",true);if(!r)return;
+        try{await audit("revoke_premium",hid,r);await F.updateDoc(F.doc(db,"households",hid),{plan:"free",planUntil:F.Timestamp.fromMillis(Date.now()),planSource:"master"});toast("Premium removido");$("#bs").click()}catch(e){toast("Falha: "+(e.code||e.message))}});
+    }catch(e){toast("Falha: "+(e.code||e.message))}};
+}
+
 /* Master Backup: AES-256-GCM, chave derivada da senha (PBKDF2-SHA256, 310.000 iterações) */
 const enc=new TextEncoder(),dec=new TextDecoder();
 const b64=u=>btoa(String.fromCharCode(...new Uint8Array(u))),ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
@@ -169,7 +192,7 @@ async function key(pass,salt){const k=await crypto.subtle.importKey("raw",enc.en
 const plain=v=>v&&v.toMillis?{__ts:v.toMillis()}:Array.isArray(v)?v.map(plain):(v&&typeof v==="object")?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,plain(x)])):v;
 const revive=v=>v&&typeof v==="object"&&!Array.isArray(v)?("__ts" in v&&Object.keys(v).length===1?F.Timestamp.fromMillis(v.__ts):Object.fromEntries(Object.entries(v).map(([k,x])=>[k,revive(x)]))):v;
 function backup(){
-  $("#tab").innerHTML=`<div class="card"><h2>Gerar Master Backup</h2><p class="mu">Exporta todas as listas compartilhadas e a configuração, criptografado com AES-256. Guarde a senha no seu gerenciador de senhas: sem ela não há como restaurar.</p>
+  $("#tab").innerHTML=`<div class="card"><h2>Gerar Master Backup</h2><p class="mu">Exporta listas compartilhadas, contas, famílias (itens, histórico, categorias) e a configuração, criptografado com AES-256. Guarde a senha no seu gerenciador de senhas: sem ela não há como restaurar.</p>
   <label>Senha do backup (mín. 12 caracteres)</label><input id="p1" type="password" autocomplete="new-password"><label>Repita a senha</label><input id="p2" type="password" autocomplete="new-password">
   <div class="row" style="margin-top:12px;justify-content:flex-end"><button class="btn" id="mk">Gerar e baixar</button></div></div>
   <div class="card"><h2>Restaurar Master Backup</h2><p class="mu">Restauração total ou de uma lista específica.</p>
@@ -179,21 +202,26 @@ function backup(){
     const r=await askReason("Gerar Master Backup","Gerar");if(!r)return;
     try{const q=await F.getDocs(lists()),c=await F.getDoc(F.doc(db,"config","app"));
       const data={app:"Minha Lista de Mercado",by:"LIVREZON TECNOLOGIA",exportedAt:Date.now(),exportedBy:user.email,project:window.FIREBASE_CONFIG.projectId,config:c.exists()?plain(c.data()):null,lists:q.docs.map(d=>({id:d.id,data:plain(d.data())}))};
+      const hs=await F.getDocs(F.collection(db,"households"));data.households=[];
+      for(const h of hs.docs){const sub={};for(const c of ["items","history","meta"]){const x=await F.getDocs(F.collection(db,"households",h.id,c));sub[c]=x.docs.map(d=>({id:d.id,data:plain(d.data())}))}data.households.push({id:h.id,data:plain(h.data()),...sub})}
+      const us=await F.getDocs(F.collection(db,"users"));data.users=us.docs.map(d=>({id:d.id,data:plain(d.data())}));
       const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),k=await key(p,salt);
       const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},k,enc.encode(JSON.stringify(data)));
       const out=JSON.stringify({format:"lzbak",v:1,alg:"AES-256-GCM",kdf:"PBKDF2-SHA256",iter:310000,salt:b64(salt),iv:b64(iv),count:data.lists.length,exportedAt:data.exportedAt,data:b64(ct)});
-      await audit("backup","all",r,`${data.lists.length} listas`);
+      await audit("backup","all",r,`${data.lists.length} listas, ${data.households.length} famílias`);
       const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([out],{type:"application/json"}));a.download=`master-backup-mercado-${new Date().toISOString().slice(0,10)}.lzbak`;document.body.appendChild(a);a.click();a.remove();
       toast(`Backup gerado: ${data.lists.length} listas`);
     }catch(e){toast("Falha: "+(e.code||e.message))}};
   $("#rd").onclick=async()=>{const f=$("#f").files[0];if(!f){toast("Escolha o arquivo");return}
     try{const j=JSON.parse(await f.text());if(j.format!=="lzbak")throw new Error("formato");const k=await key($("#p3").value,ub64(j.salt));
       const data=JSON.parse(dec.decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:ub64(j.iv)},k,ub64(j.data))));
-      $("#rres").innerHTML=`<p class="ok">Backup de ${dth(data.exportedAt)} · ${data.lists.length} listas · por ${esc(data.exportedBy)}</p>
+      $("#rres").innerHTML=`<p class="ok">Backup de ${dth(data.exportedAt)} · ${data.lists.length} listas · ${(data.households||[]).length} famílias · por ${esc(data.exportedBy)}</p>
       <div class="row"><button class="btn dan" id="ra">Restaurar tudo</button><input id="one" class="grow" placeholder="ou código de uma lista"><button class="btn sec" id="r1">Restaurar esta</button></div>`;
       const put=async items=>{for(const it of items)await F.setDoc(F.doc(db,"lists",it.id),revive(it.data))};
       $("#ra").onclick=async()=>{const r=await askReason(`Restaurar TODAS as ${data.lists.length} listas (sobrescreve as atuais com o mesmo código)`,"Restaurar",true);if(!r)return;
-        try{await audit("restore","all",r,`${data.lists.length} listas`);await put(data.lists);if(data.config)await F.setDoc(F.doc(db,"config","app"),revive(data.config));toast("Restauração concluída")}catch(e){toast("Falha: "+(e.code||e.message))}};
+        try{await audit("restore","all",r,`${data.lists.length} listas, ${(data.households||[]).length} famílias`);await put(data.lists);
+          for(const h of (data.households||[])){await F.setDoc(F.doc(db,"households",h.id),revive(h.data));for(const c of ["items","history","meta"])for(const d of (h[c]||[]))await F.setDoc(F.doc(db,"households",h.id,c,d.id),revive(d.data))}
+          for(const u of (data.users||[]))await F.setDoc(F.doc(db,"users",u.id),revive(u.data));if(data.config)await F.setDoc(F.doc(db,"config","app"),revive(data.config));toast("Restauração concluída")}catch(e){toast("Falha: "+(e.code||e.message))}};
       $("#r1").onclick=async()=>{const id=$("#one").value.trim(),it=data.lists.find(x=>x.id===id);if(!it){toast("Código não está no backup");return}
         const r=await askReason("Restaurar a lista "+id.slice(0,6)+"…","Restaurar",true);if(!r)return;
         try{await audit("restore",id,r);await put([it]);toast("Lista restaurada")}catch(e){toast("Falha: "+(e.code||e.message))}};

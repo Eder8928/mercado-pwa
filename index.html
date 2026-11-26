@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://firestore.googleapis.com https://*.googleapis.com https://*.firebaseio.com https://world.openfoodfacts.org https://world.openbeautyfacts.org https://world.openproductsfacts.org; frame-src 'none'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://mercado-livrezon.firebaseapp.com https://world.openfoodfacts.org https://world.openbeautyfacts.org https://world.openproductsfacts.org; frame-src https://mercado-livrezon.firebaseapp.com https://accounts.google.com https://apis.google.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#0B1E40">
 <meta name="description" content="Lista de compras de supermercado com controle do que tem em casa, leitor de código de barras, lista compartilhada e histórico de gastos. LIVREZON TECNOLOGIA.">
@@ -131,6 +131,7 @@ button,a{font-family:inherit}
 <div id="layer"></div>
 <script>
 "use strict";
+if(window.top!==window.self){try{window.top.location=window.location.href}catch(e){document.documentElement.innerHTML=""}throw new Error("framed")}
 const KEY="mercado.v1";
 const UNITS=["un","kg","g","L","ml","pct","cx","dz","lata","garrafa"];
 const DEF_CATS=["Hortifruti","Açougue","Padaria","Laticínios","Mercearia","Bebidas","Limpeza","Higiene","Congelados","Outros"];
@@ -187,7 +188,7 @@ function ask(msg,okTxt="Confirmar",danger=false){return new Promise(res=>{sheet(
 function onAll(sel,ev,fn){document.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,e=>fn(el,e)))}
 
 /* ----- marca ----- */
-const APP_VERSION="2.0.2";
+const APP_VERSION="3.0.0";
 const brandHTML=()=>`<a class="brand" href="https://livrezon.com.br" target="_blank" rel="noopener"><img src="livrezon-selo-96.png" alt="Selo LIVREZON TECNOLOGIA"><span>Desenvolvido por<br><b>LIVREZON TECNOLOGIA</b></span></a><div class="mu sm" style="text-align:center">Minha Lista de Mercado · v${APP_VERSION} · <a href="privacidade.html" style="color:inherit">Privacidade</a> · <a href="termos.html" style="color:inherit">Termos</a></div>`;
 
 /* ---------- telas ---------- */
@@ -565,7 +566,7 @@ VIEWS.settings=()=>({title:"Opções",html:`
   <h2>Resumo</h2>
   <div class="card"><div class="kv"><span>Itens cadastrados</span><b>${S.items.length}</b></div><div class="kv"><span>Listas abertas</span><b>${S.lists.length}</b></div><div class="kv"><span>Compras registradas</span><b>${S.history.length}</b></div><div class="kv"><span>Armazenamento</span><b class="${storageOK?"pos":"neg"}">${storageOK?"Salvando no aparelho":"Indisponível"}</b></div></div>
   <button class="btn danger full" id="reset">Apagar todos os dados</button>
-  <div class="mu sm" style="text-align:center;margin-top:16px">Funciona offline · Sem login · Dados locais ficam no seu aparelho</div>
+  <div class="mu sm" style="text-align:center;margin-top:16px">Funciona offline · Login opcional · Sem anúncios</div>
   ${brandHTML()}`,
   after(){
     const data=()=>JSON.stringify(S);
@@ -859,12 +860,12 @@ function pdfHistory(list,label){return withPdf(async()=>{
 })}
 
 /* ----- LGPD: aceite, privacidade ----- */
-const LEGAL_V="1.1";
+const LEGAL_V="1.2";
 function consentHTML(){return `<div class="welcome"><div class="wbox">
   <img src="livrezon-selo-192.png" alt="LIVREZON TECNOLOGIA" class="wlogo">
   <h2>Minha Lista de Mercado</h2>
   <p>Organize suas compras, saiba o que tem em casa, escaneie produtos, compre junto com quem você quiser e acompanhe seus gastos.</p>
-  <ul><li>🔒 Sem cadastro. Seus dados ficam <b>no seu aparelho</b>.</li><li>☁️ Só a lista que você <b>compartilhar</b> vai para a nuvem, e é apagada depois que deixa de ser usada.</li><li>🚫 Sem anúncios e sem rastreadores.</li></ul>
+  <ul><li>🔒 Sem cadastro obrigatório. Seus dados ficam <b>no seu aparelho</b>, ou na nuvem se você entrar com o Google.</li><li>☁️ Só a lista que você <b>compartilhar</b> vai para a nuvem, e é apagada depois que deixa de ser usada.</li><li>🚫 Sem anúncios e sem rastreadores.</li></ul>
   <label class="row wchk"><input type="checkbox" id="agree"> <span>Li e concordo com os <a href="termos.html">Termos de Uso</a> e a <a href="privacidade.html">Política de Privacidade</a>.</span></label>
   <button class="btn full" id="start" disabled style="opacity:.5">Começar</button>
   <div class="wsign">Desenvolvido por <b>LIVREZON TECNOLOGIA</b><br><span>Soluções tecnológicas para um futuro real.</span></div></div></div>`}
@@ -963,5 +964,6 @@ load();render();
   addEventListener("online",()=>{if(S.lists.some(l=>l.shared&&!l.done)){S.lists.filter(l=>l.shared&&!l.done).forEach(subscribe);syncAll()}});
 })();
 </script>
+<script src="cloud.js"></script>
 </body>
 </html>
