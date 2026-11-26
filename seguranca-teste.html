@@ -68,7 +68,7 @@ document.getElementById("a").onclick=async()=>{
 document.getElementById("g").onclick=async()=>{
   if(busy)return;lock(true);try{
   out.innerHTML="";pass=fail=0;
-  try{await F.signInWithPopup(auth,new F.GoogleAuthProvider())}catch(e){row("Login Google",false,e.code||e.message);return}
+  try{await F.signOut(auth).catch(()=>{});const gp=new F.GoogleAuthProvider();gp.setCustomParameters({prompt:"select_account"});await F.signInWithPopup(auth,gp)}catch(e){row("Login Google",false,e.code||e.message);return}
   const u=auth.currentUser,me=u.uid;
   if((window.MASTER_EMAILS||[]).includes((u.email||"").toLowerCase())){row("Conta usada",false,"use uma conta que NÃO seja a do Master");await F.signOut(auth);return}
   const H=d("households",me),fake=rid(28);
