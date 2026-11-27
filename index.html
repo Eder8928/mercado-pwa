@@ -21,6 +21,7 @@
 :root{--navy:#0B1E40;--navy2:#061430;--au:#D4A02A;--g:#0B1E40;--g2:#061430;--on:#fff;--gl:#e8edf6;--ok:#1a8a4f;--okl:#e6f4ec;--bg:#f4f6fa;--card:#fff;--tx:#14213a;--mu:#5f6b80;--bd:#dfe4ee;--red:#c6372f;--redl:#fdecea;--yel:#a8700f;--yell:#fdf4e3;--r:14px}
 @media (prefers-color-scheme:dark){:root{--g:#D4A02A;--g2:#0B1E40;--on:#061430;--gl:#1b2a47;--ok:#4cc184;--okl:#16301f;--bg:#061430;--card:#0f2140;--tx:#eef2f9;--mu:#9fb0cc;--bd:#22355a;--redl:#3a1d1b;--yell:#3a2f17}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 header{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;border-bottom:3px solid var(--au);padding:calc(env(safe-area-inset-top) + 12px) 16px 12px;display:flex;align-items:center;gap:10px}
 header h1{font-size:19px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -28,7 +29,8 @@ header button{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius
 main{padding:14px 14px calc(96px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto}
 nav{position:fixed;bottom:0;left:0;right:0;z-index:5;background:var(--card);border-top:1px solid var(--bd);display:flex;padding-bottom:env(safe-area-inset-bottom)}
 nav button{flex:1;background:none;border:0;color:var(--mu);padding:8px 2px 9px;font-size:11.5px;display:flex;flex-direction:column;align-items:center;gap:2px}
-nav button .i{font-size:21px;line-height:1}
+nav button .i{font-size:21px;line-height:1;position:relative}
+.nbadge{position:absolute;top:-6px;right:-12px;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;border-radius:10px;padding:1px 5px;line-height:1.3}
 nav button.on{color:var(--g);font-weight:700}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:12px}
 .row{display:flex;align-items:center;gap:10px}
@@ -115,6 +117,14 @@ button,a{font-family:inherit}
 .wchk{color:#eef2f9!important;text-align:left;font-size:14px;margin:10px 0 14px;align-items:flex-start}.wchk input{width:22px;height:22px;flex:none;margin-top:2px}.wbox a{color:#F2C861}
 .wbox .btn{background:#D4A02A;color:#061430}.wsign{margin-top:14px;font-size:12.5px;color:#9fb0cc}.wsign span{font-style:italic}
 .ctl{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.msgs{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:10px;height:min(52vh,460px);overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:82%;background:var(--gl);border-radius:14px 14px 14px 4px;padding:8px 11px;align-self:flex-start;word-wrap:break-word}
+.msg.me{align-self:flex-end;background:var(--navy);color:#fff;border-radius:14px 14px 4px 14px}.msg.me a{color:#F2C861}
+.msg.sys{border:1px dashed var(--au)}.who2{font-size:12px;font-weight:800;color:var(--au)}.mt{font-size:11px;opacity:.7;margin-top:3px;text-align:right}
+.lnk{background:none;border:0;color:inherit;text-decoration:underline;font-size:11px;padding:0;cursor:pointer}
+.pwrap{display:flex;flex-wrap:wrap;gap:6px}.pchip{background:var(--gl);border-radius:20px;padding:5px 10px;font-size:13.5px}.pchip.mine{box-shadow:inset 0 0 0 2px var(--au)}
+.chatin{margin-top:8px;position:sticky;bottom:calc(70px + env(safe-area-inset-bottom));background:var(--bg);padding:6px 0}
+@media (min-width:900px){.chatin{bottom:0}}
 .catH{font-size:13px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.04em;margin:14px 4px 6px}
 </style>
 </head>
@@ -127,6 +137,7 @@ button,a{font-family:inherit}
  <button data-go="pantry"><span class="i">🏡</span>Em casa</button>
  <button data-go="items"><span class="i">🥫</span>Itens</button>
  <button data-go="history"><span class="i">🧾</span>Compras</button>
+ <button data-go="chat" id="navChat" hidden><span class="i">💬<span class="nbadge" hidden>0</span></span>Família</button>
 </nav>
 <div id="layer"></div>
 <script>
@@ -144,7 +155,7 @@ function load(){
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));storageOK=true}catch(e){storageOK=false}queueSync()}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
-function seed(){
+function seed(){return;
   [["Arroz","Mercearia","pct",1],["Feijão","Mercearia","pct",1],["Açúcar","Mercearia","pct",1],["Café","Mercearia","pct",1],["Óleo","Mercearia","garrafa",1],["Leite","Laticínios","L",6],["Ovos","Hortifruti","dz",1],["Pão","Padaria","un",0],["Banana","Hortifruti","kg",0],["Papel higiênico","Higiene","pct",1],["Sabão em pó","Limpeza","cx",1],["Detergente","Limpeza","un",2]]
   .forEach(([n,c,u,m])=>S.items.push({id:uid(),name:n,cat:c,unit:u,price:0,min:m,stock:0}));
 }
@@ -188,7 +199,7 @@ function ask(msg,okTxt="Confirmar",danger=false){return new Promise(res=>{sheet(
 function onAll(sel,ev,fn){document.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,e=>fn(el,e)))}
 
 /* ----- marca ----- */
-const APP_VERSION="3.0.0";
+const APP_VERSION="3.1.0";
 const brandHTML=()=>`<a class="brand" href="https://livrezon.com.br" target="_blank" rel="noopener"><img src="livrezon-selo-96.png" alt="Selo LIVREZON TECNOLOGIA"><span>Desenvolvido por<br><b>LIVREZON TECNOLOGIA</b></span></a><div class="mu sm" style="text-align:center">Minha Lista de Mercado · v${APP_VERSION} · <a href="privacidade.html" style="color:inherit">Privacidade</a> · <a href="termos.html" style="color:inherit">Termos</a></div>`;
 
 /* ---------- telas ---------- */
@@ -393,11 +404,11 @@ VIEWS.pantry=()=>{
   <button class="btn full" id="scp" style="margin-bottom:10px">📷 Escanear item de casa</button>
   ${nF?`<button class="btn sec full" id="gen" style="margin-bottom:12px">⚡ Criar lista com os ${nF} itens que faltam</button>`:""}
   ${its.length?cats.map(c=>`<div class="catH">${esc(c)}</div><div class="list">${its.filter(i=>i.cat===c).map(i=>{const[s,cl]=status(i);return`<div class="li"><div class="grow" data-e="${i.id}"><div class="nm">${esc(i.name)}</div><div class="mu sm">mín. ${fmtN(i.min)} ${esc(i.unit)} · <span class="badge ${cl}">${s}</span></div></div>
-  <div class="step"><button data-d="${i.id}" data-v="-1">−</button><span>${fmtN(i.stock)}</span><button data-d="${i.id}" data-v="1">+</button></div></div>`}).join("")}</div>`).join(""):`<div class="empty"><span class="i">✅</span>${panF==="need"?"Nada faltando em casa!":"Cadastre itens na aba Itens."}</div>`}
+  <div class="step"><button data-d="${i.id}" data-v="-1">−</button><span>${fmtN(i.stock)}</span><button data-d="${i.id}" data-v="1">+</button></div></div>`}).join("")}</div>`).join(""):`<div class="empty"><span class="i">✅</span>${panF==="need"?"Nada faltando em casa!":"Nenhum item cadastrado ainda.<br><br><button class='btn sec' id='sugP'>🧺 Adicionar itens sugeridos</button>"}</div>`}
   <div class="mu sm" style="text-align:center">Toque no nome para editar o mínimo. Ao finalizar uma compra, as quantidades compradas entram aqui.</div>`,
   after(){
     onAll("[data-f]","click",el=>{panF=el.dataset.f;render()});
-    $("#gen")&&($("#gen").onclick=listFromMissing);$("#scp").onclick=()=>scan(c=>onScanned(c,{t:"pantry"}),"Escanear item de casa");
+    $("#gen")&&($("#gen").onclick=listFromMissing);$("#sugP")&&($("#sugP").onclick=suggestItems);$("#scp").onclick=()=>scan(c=>onScanned(c,{t:"pantry"}),"Escanear item de casa");
     onAll("[data-d]","click",el=>{const i=item(el.dataset.d);i.stock=Math.max(0,Math.round(((+i.stock||0)+ +el.dataset.v)*1000)/1000);save();render()});
     onAll("[data-e]","click",el=>itemForm(el.dataset.e));
   }}
@@ -860,7 +871,7 @@ function pdfHistory(list,label){return withPdf(async()=>{
 })}
 
 /* ----- LGPD: aceite, privacidade ----- */
-const LEGAL_V="1.2";
+const LEGAL_V="1.3";
 function consentHTML(){return `<div class="welcome"><div class="wbox">
   <img src="livrezon-selo-192.png" alt="LIVREZON TECNOLOGIA" class="wlogo">
   <h2>Minha Lista de Mercado</h2>
@@ -965,5 +976,6 @@ load();render();
 })();
 </script>
 <script src="cloud.js"></script>
+<script src="chat.js"></script>
 </body>
 </html>

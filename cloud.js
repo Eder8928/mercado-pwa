@@ -48,6 +48,18 @@ restore=async function(txt){
     const keep={consent:S.consent,cloud:S.cloud,me:S.me||c.me};S=Object.assign(c,keep);save();toast("Backup restaurado");stack=[];go("home",null,false)}
 };
 
+/* ---------- limpeza dos itens de exemplo (só os que nunca foram usados) ---------- */
+const SEED_DEF={"Arroz":["Mercearia","pct",1],"Feijão":["Mercearia","pct",1],"Açúcar":["Mercearia","pct",1],"Café":["Mercearia","pct",1],"Óleo":["Mercearia","garrafa",1],"Leite":["Laticínios","L",6],"Ovos":["Hortifruti","dz",1],"Pão":["Padaria","un",0],"Banana":["Hortifruti","kg",0],"Papel higiênico":["Higiene","pct",1],"Sabão em pó":["Limpeza","cx",1],"Detergente":["Limpeza","un",2]};
+function cleanSeeds(){
+  const used=new Set();S.lists.forEach(l=>l.entries.forEach(e=>used.add(e.itemId)));S.history.forEach(h=>h.entries.forEach(e=>used.add(e.itemId)));
+  const n=S.items.length;
+  S.items=S.items.filter(i=>{const d=Object.prototype.hasOwnProperty.call(SEED_DEF,i.name)?SEED_DEF[i.name]:null;
+    return !(d&&i.cat===d[0]&&i.unit===d[1]&&(+i.min||0)===d[2]&&!(+i.stock)&&!(+i.price)&&!i.barcode&&!used.has(i.id))});
+  return n-S.items.length;
+}
+if(!S.cloud&&!S.seedClean){const n=cleanSeeds();S.seedClean=true;n?save():persistLocalEarly()}
+function persistLocalEarly(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
 /* ---------- conta Google ---------- */
 const CL={hid:null,h:null,subs:[],cache:{items:{},history:{},meta:null},timer:0,merged:false,attaching:null,err:0};
 const authU=()=>FB.m&&FB.app?FB.m.getAuth(FB.app).currentUser:null;
@@ -180,6 +192,7 @@ function mergeAndPush(){
     S.history.forEach(h=>h.entries.forEach(e=>{if(remap[e.itemId])e.itemId=remap[e.itemId]}));
   }
   if(CL.cache.meta!==null){const extra=S.cats.filter(c=>!JSON.parse(CL.cache.meta).includes(c));S.cats=[...JSON.parse(CL.cache.meta),...extra].slice(0,40)}
+  if(!S.seedCleanCloud){cleanSeeds();S.seedCleanCloud=true;S.seedClean=true}
   persistLocal();pushNow();render();
 }
 
@@ -276,7 +289,7 @@ async function deleteAccount(){
 /* ---------- Premium (assinatura vem na Fase 2) ---------- */
 function premiumSheet(feature){
   sheet(`<div style="text-align:center"><span style="font-size:38px">⭐</span><h3>${esc(feature)} é Premium</h3>
-  <div class="mu">Família sincronizada, painel de gastos com gráficos, comparação de preços e de mercados, alertas, meta mensal e importação do cupom fiscal.</div>
+  <div class="mu">Família sincronizada, chat da família com “onde cada um está” no mercado, painel de gastos com gráficos, comparação de preços e de mercados, alertas, meta mensal e importação do cupom fiscal.</div>
   <div class="okbox" style="margin-top:12px">A assinatura dentro do app chega em breve.</div></div>
   <button class="btn full" id="x" style="margin-top:12px">Entendi</button>`,mm=>mm.querySelector("#x").onclick=close);
 }
@@ -292,7 +305,7 @@ function accountHTML(){
    <div class="kv"><span>Conta</span><b style="word-break:break-all">${esc(u.email||"")}</b></div>
    <div class="kv"><span>Sincronização</span><b class="${CL.merged?"pos":""}">${CL.merged?"☁️ Ativa":"⏳ Conectando…"}</b></div>
    <div class="kv"><span>Família</span><b>${esc(h&&h.name||"—")} · ${n} pessoa(s)</b></div>
-   <div class="kv"><span>Plano</span><b>${prem?`⭐ Premium até ${dt(h.planUntil.toMillis())}`:"Grátis"}</b></div>
+   <div class="kv"><span>Plano</span><b>${prem?`⭐ Premium até ${dt(h.planUntil.toMillis())}`:(typeof isMasterUser==="function"&&isMasterUser()?"Master (acesso total)":"Grátis")}</b></div>
    <div class="grid2" style="margin-top:12px">${isOwnerH()?`<button class="btn sec" id="finv">👨‍👩‍👧 Convidar</button>`:`<button class="btn ghost" id="fleave">🚪 Sair da família</button>`}<button class="btn ghost" id="gout">Sair da conta</button></div>
    ${isOwnerH()&&n>1?`<button class="btn ghost full" id="freset" style="margin-top:8px">Remover os outros membros</button>`:""}
    <button class="btn danger full" id="gdel" style="margin-top:8px">Excluir minha conta e dados da nuvem</button></div>`;
