@@ -115,7 +115,7 @@ button,a{font-family:inherit}
 .wbox h2{margin:8px 0 6px;color:#F2C861;font-size:22px}.wbox p{margin:0 0 10px;color:#cfd8ea}.wbox ul{text-align:left;padding-left:4px;list-style:none;margin:0 0 12px;font-size:15px}.wbox li{margin:6px 0}
 .wlogo{width:110px;height:110px;border-radius:50%;box-shadow:0 0 0 3px #D4A02A,0 0 30px rgba(212,160,42,.4)}
 .wchk{color:#eef2f9!important;text-align:left;font-size:14px;margin:10px 0 14px;align-items:flex-start}.wchk input{width:22px;height:22px;flex:none;margin-top:2px}.wbox a{color:#F2C861}
-.wbox .btn{background:#D4A02A;color:#061430}.wsign{margin-top:14px;font-size:12.5px;color:#9fb0cc}.wsign span{font-style:italic}
+.wbox .btn{background:#D4A02A;color:#061430}.wbox .btn.wsec{background:transparent;color:#F2C861;border:1px solid rgba(212,160,42,.6)}.wsmall{font-size:12.5px;color:#9fb0cc;margin:-2px 0 10px}.wsign{margin-top:14px;font-size:12.5px;color:#9fb0cc}.wsign span{font-style:italic}
 .ctl{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
 .msgs{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:10px;height:min(52vh,460px);overflow-y:auto;display:flex;flex-direction:column;gap:8px}
 .msg{max-width:82%;background:var(--gl);border-radius:14px 14px 14px 4px;padding:8px 11px;align-self:flex-start;word-wrap:break-word}
@@ -199,7 +199,7 @@ function ask(msg,okTxt="Confirmar",danger=false){return new Promise(res=>{sheet(
 function onAll(sel,ev,fn){document.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,e=>fn(el,e)))}
 
 /* ----- marca ----- */
-const APP_VERSION="3.1.0";
+const APP_VERSION="3.2.0";
 const brandHTML=()=>`<a class="brand" href="https://livrezon.com.br" target="_blank" rel="noopener"><img src="livrezon-selo-96.png" alt="Selo LIVREZON TECNOLOGIA"><span>Desenvolvido por<br><b>LIVREZON TECNOLOGIA</b></span></a><div class="mu sm" style="text-align:center">Minha Lista de Mercado · v${APP_VERSION} · <a href="privacidade.html" style="color:inherit">Privacidade</a> · <a href="termos.html" style="color:inherit">Termos</a></div>`;
 
 /* ---------- telas ---------- */
@@ -876,16 +876,19 @@ function consentHTML(){return `<div class="welcome"><div class="wbox">
   <img src="livrezon-selo-192.png" alt="LIVREZON TECNOLOGIA" class="wlogo">
   <h2>Minha Lista de Mercado</h2>
   <p>Organize suas compras, saiba o que tem em casa, escaneie produtos, compre junto com quem você quiser e acompanhe seus gastos.</p>
-  <ul><li>🔒 Sem cadastro obrigatório. Seus dados ficam <b>no seu aparelho</b>, ou na nuvem se você entrar com o Google.</li><li>☁️ Só a lista que você <b>compartilhar</b> vai para a nuvem, e é apagada depois que deixa de ser usada.</li><li>🚫 Sem anúncios e sem rastreadores.</li></ul>
+  <ul><li>🔒 Sem cadastro obrigatório. Seus dados ficam <b>no seu aparelho</b>, ou na nuvem se você entrar com o Google.</li><li>☁️ Na nuvem só vai o que você <b>compartilhar</b> ou <b>sincronizar</b> com sua conta Google.</li><li>🚫 Sem anúncios e sem rastreadores.</li></ul>
   <label class="row wchk"><input type="checkbox" id="agree"> <span>Li e concordo com os <a href="termos.html">Termos de Uso</a> e a <a href="privacidade.html">Política de Privacidade</a>.</span></label>
-  <button class="btn full" id="start" disabled style="opacity:.5">Começar</button>
+  ${fbOn()&&!(S.cloud)?`<button class="btn full" id="startG" disabled style="opacity:.5;margin-bottom:8px">Entrar com Google</button><div class="wsmall">Sincroniza seus aparelhos e ativa o Premium da sua conta.</div>`:""}
+  <button class="btn full ${fbOn()&&!(S.cloud)?"wsec":""}" id="start" disabled style="opacity:.5">${fbOn()&&!(S.cloud)?"Usar sem conta":"Começar"}</button>
   <div class="wsign">Desenvolvido por <b>LIVREZON TECNOLOGIA</b><br><span>Soluções tecnológicas para um futuro real.</span></div></div></div>`}
 function needConsent(){return !(S.consent&&S.consent.v===LEGAL_V)}
 function showConsent(){
   const w=document.createElement("div");w.id="consent";w.innerHTML=consentHTML();document.body.appendChild(w);
-  const a=w.querySelector("#agree"),b=w.querySelector("#start");
-  a.onchange=()=>{b.disabled=!a.checked;b.style.opacity=a.checked?1:.5};
-  b.onclick=()=>{if(!a.checked)return;S.consent={v:LEGAL_V,at:Date.now()};save();w.remove()};
+  const a=w.querySelector("#agree"),b=w.querySelector("#start"),g=w.querySelector("#startG"),bs=[b,g].filter(Boolean);
+  a.onchange=()=>bs.forEach(x=>{x.disabled=!a.checked;x.style.opacity=a.checked?1:.5});
+  const accept=()=>{S.consent={v:LEGAL_V,at:Date.now()};save();w.remove()};
+  b.onclick=()=>{if(!a.checked)return;accept()};
+  g&&(g.onclick=()=>{if(!a.checked)return;accept();typeof signInGoogle==="function"&&signInGoogle()});
 }
 function privacyHTML(){
   const own=S.lists.filter(l=>l.shared&&l.shared.owner&&!l.done).length;
