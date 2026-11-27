@@ -123,12 +123,24 @@ function startSync(hid,u){
   detachCloud();
   const m=FB.m,prev=S.cloud&&S.cloud.hid;CL.hid=hid;
   if(prev!==hid){S.cloud={hid,uid:u.uid,email:u.email};persistLocal()}
-  CL.subs.push(m.onSnapshot(hdoc(hid),s=>{CL.h=s.exists()?s.data():null;softRender()},err=>{console.warn(err);onRemoved()}));
+  CL.subs.push(m.onSnapshot(hdoc(hid),s=>{CL.h=s.exists()?s.data():null;masterAutoPremium();softRender()},err=>{console.warn(err);onRemoved()}));
   let first={items:true,history:true,meta:true};
   const done=()=>{if(!first.items&&!first.history&&!first.meta&&!CL.merged){CL.merged=true;mergeAndPush()}};
   CL.subs.push(m.onSnapshot(hcol(hid,"items"),s=>{applyItems(s);first.items=false;done()},e=>console.warn(e)));
   CL.subs.push(m.onSnapshot(hcol(hid,"history"),s=>{applyHistory(s);first.history=false;done()},e=>console.warn(e)));
   CL.subs.push(m.onSnapshot(m.doc(FB.db,"households",hid,"meta","main"),s=>{applyMeta(s);first.meta=false;done()},e=>{first.meta=false;done()}));
+}
+/* conta Master: a própria família fica Premium (registrado na auditoria) */
+let masterAuto=false;
+async function masterAutoPremium(){
+  if(masterAuto||!CL.h||!isOwnerH()||isPremium())return;
+  const u=authU();if(!(u&&u.email&&(window.MASTER_EMAILS||[]).map(e=>e.toLowerCase()).includes(u.email.toLowerCase())))return;
+  masterAuto=true;const m=FB.m;
+  try{
+    await m.addDoc(m.collection(FB.db,"audit"),{at:m.serverTimestamp(),email:u.email,action:"grant_premium",target:CL.hid,reason:"Acesso Master: família do proprietário",details:"automático"});
+    await m.updateDoc(hdoc(CL.hid),{plan:"premium",planUntil:m.Timestamp.fromMillis(Date.UTC(2100,0,1)),planSource:"master"});
+    toast("⭐ Premium ativado na sua família (Acesso Master)");
+  }catch(e){console.warn(e);masterAuto=false}
 }
 function onRemoved(){
   if(!CL.hid)return;const was=CL.hid;detachCloud();
@@ -314,6 +326,12 @@ function bindAccount(){
   const b=(id,f)=>{const e=$(id);e&&(e.onclick=f)};
   b("#gin",signInGoogle);b("#gout",signOutGoogle);b("#finv",inviteFamily);b("#fleave",leaveFamily);b("#freset",resetMembers);b("#gdel",deleteAccount);
 }
+const _home=VIEWS.home;
+VIEWS.home=()=>{const r=_home();let b="";
+  if(fbOn()){const u=authU();
+    if(!isGoogle(u))b=`<div class="card row" style="margin-bottom:12px;border-color:var(--au)"><span style="font-size:26px">☁️</span><div class="grow"><b>Entre com sua conta Google</b><div class="mu sm">Sincronize seus aparelhos e use os recursos Premium da sua conta.</div></div><button class="btn" id="ginH" style="flex:none">Entrar</button></div>`;
+    else b=`<div class="row" style="margin:0 2px 10px;gap:6px;flex-wrap:wrap"><span class="badge ${isPremium()?"b-low":"b-ok"}">${isPremium()?"⭐ Premium":"Grátis"}</span><span class="mu sm" style="overflow:hidden;text-overflow:ellipsis">${esc(u.email||"")}</span></div>`}
+  return{...r,html:b+r.html,after(){r.after&&r.after();const g=$("#ginH");g&&(g.onclick=signInGoogle)}}};
 const _settings=VIEWS.settings;
 VIEWS.settings=()=>{const r=_settings();return{...r,html:accountHTML()+r.html,after(){r.after&&r.after();bindAccount()}}};
 softRender=function(){const a=document.activeElement;if($("#layer").firstChild||(a&&a.matches&&a.matches("#app input, #app textarea, #app select"))){pendingRender=true;return}render()};
