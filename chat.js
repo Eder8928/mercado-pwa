@@ -130,3 +130,5 @@ wipeHousehold=async function(hid){
 const _soft2=softRender;
 softRender=function(){if(view==="chat"){drawChat();drawPresence();return}_soft2()};
 navChat();
+/* redesenha a tela já com conta, limpeza e chat carregados */
+render();
