@@ -95,6 +95,10 @@ document.getElementById("g").onclick=async()=>{
   await deny("Item com campo extra (injeção)",()=>F.setDoc(it,{name:"x",cat:"Outros",unit:"un",price:1,min:0,stock:0,barcode:"",t:Date.now(),by:me,admin:true}));
   await deny("Item assinado por outra pessoa",()=>F.setDoc(it,{name:"x",cat:"Outros",unit:"un",price:1,min:0,stock:0,barcode:"",t:Date.now(),by:fake}));
   await deny("Histórico com 1000 itens (abuso)",()=>F.setDoc(d("households",me,"history","sec-test"),{date:Date.now(),store:"",listName:"",budget:0,total:1,refTotal:0,missing:0,by:"",entries:Array(1000).fill({}),t:Date.now(),uid:me}));
+  await deny("Envia mensagem no chat sem Premium",()=>F.addDoc(c("households",me,"chat"),{uid:me,name:"x",kind:"text",text:"oi",sector:"",at:F.serverTimestamp()}));
+  await deny("Lê o chat sem Premium",()=>F.getDocs(c("households",me,"chat")));
+  await deny("Grava presença sem Premium",()=>F.setDoc(d("households",me,"presence",me),{name:"x",sector:"Caixa",at:F.serverTimestamp()}));
+  await deny("Lê o chat de família alheia",()=>F.getDocs(c("households",fake,"chat")));
   await deny("Liga o modo manutenção",()=>F.setDoc(d("config","app"),{maintenance:true}));
   await deny("Lê o log de auditoria",()=>F.getDocs(c("audit")));
   await deny("Grava no log de auditoria",()=>F.addDoc(c("audit"),{at:F.serverTimestamp(),email:u.email,action:"x",target:"x",reason:"xxxx",details:""}));

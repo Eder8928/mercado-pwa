@@ -25,6 +25,8 @@ service cloud.firestore {
     function premium(h) { return 'plan' in h && h.plan == 'premium' && h.planUntil > request.time; }
     function str(v, max) { return v is string && v.size() <= max; }
     function num(v, max) { return (v is int || v is float) && v >= 0 && v <= max; }
+    function chatOk(hid) { return isMember(hid) && (premium(hh(hid)) || isMaster()); }
+    function geo(v, lim) { return (v is int || v is float) && v >= -lim && v <= lim; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
     // ---------- lista compartilhada por link (v2) ----------
@@ -149,6 +151,31 @@ service cloud.firestore {
           && num(request.resource.data.budget, 10000000)
           && request.resource.data.entries is list && request.resource.data.entries.size() <= 400
           && request.resource.data.t is int && request.resource.data.uid == request.auth.uid;
+      }
+
+      // chat da família (Premium ou Master) — mensagens somem em 7 dias
+      match /chat/{msgId} {
+        allow read: if chatOk(hid);
+        allow create: if chatOk(hid) && msgId.size() <= 40
+          && request.resource.data.keys().hasOnly(['uid','name','kind','text','sector','lat','lng','acc','at'])
+          && request.resource.data.uid == request.auth.uid
+          && str(request.resource.data.name, 30)
+          && request.resource.data.kind in ['text','sector','loc']
+          && str(request.resource.data.text, 500) && str(request.resource.data.sector, 40)
+          && (!('lat' in request.resource.data) || (geo(request.resource.data.lat, 90) && geo(request.resource.data.lng, 180) && num(request.resource.data.acc, 100000)))
+          && request.resource.data.at == request.time;
+        allow update: if false;
+        allow delete: if isMember(hid) && (resource.data.uid == request.auth.uid || isOwner(hid)
+          || resource.data.at < request.time - duration.value(7, 'd'));
+      }
+      // onde cada membro está (setor do mercado)
+      match /presence/{uid} {
+        allow read: if chatOk(hid);
+        allow create, update: if chatOk(hid) && uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['name','sector','at'])
+          && str(request.resource.data.name, 30) && str(request.resource.data.sector, 40)
+          && request.resource.data.at == request.time;
+        allow delete: if isMember(hid) && (uid == request.auth.uid || isOwner(hid));
       }
 
       // categorias e preferências da família
